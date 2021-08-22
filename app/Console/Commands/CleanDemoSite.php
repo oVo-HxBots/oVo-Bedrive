@@ -17,6 +17,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Storage;
 
+class CleanDemoSite extends Command
 {
     /**
      * @var string
