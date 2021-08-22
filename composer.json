@@ -5,7 +5,7 @@
     "license": "MIT",
     "type": "project",
     "require": {
-        "php": "^7.2.5",
+        "php": "8.0.9",
         "algolia/algoliasearch-client-php": "^2.7.0",
         "axisofstevil/stop-words": "^0.1.0",
         "cocur/slugify": "^4.0",
