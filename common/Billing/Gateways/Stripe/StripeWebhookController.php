@@ -1,7 +1,6 @@
 <?php namespace Common\Billing\Gateways\Stripe;
 
 use Common\Billing\Gateways\GatewayFactory;
-use Common\Billing\Gateways\Stripe\StripeGateway;
 use Common\Billing\Invoices\CrupdateInvoice;
 use Common\Billing\Subscription;
 use Illuminate\Http\Request;
@@ -99,6 +98,14 @@ class StripeWebhookController extends Controller
 
     protected function handleSubscriptionFailed($payload)
     {
+        $gatewayId = $payload['data']['object']['subscription'];
+
+        $subscription = $this->subscription->where('gateway_id', $gatewayId)->first();
+
+        if ($subscription && ! $subscription->cancelled()) {
+            $subscription->markAsCancelled();
+        }
+
         return response('Webhook handled', 200);
     }
 }

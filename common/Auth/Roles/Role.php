@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
+ * Common\Auth\Roles\Role
+ *
  * @property integer $id
  * @property string $name
  * @property Carbon $created_at
@@ -18,6 +20,15 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read Collection|Permission[] $permissions
  * @mixin Eloquent
  * @property int $guests
+ * @property string|null $legacy_permissions
+ * @property string|null $description
+ * @property string $type
+ * @property int $internal
+ * @property-read int|null $permissions_count
+ * @property-read int|null $users_count
+ * @method static \Illuminate\Database\Eloquent\Builder|Role newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Role newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Role query()
  */
 class Role extends Model
 {

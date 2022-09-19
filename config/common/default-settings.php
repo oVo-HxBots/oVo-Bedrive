@@ -21,6 +21,26 @@ return [
         ['name' => 'Drive Navbar', 'position' => 'drive-navbar', 'items' => [
             ['type' => 'route', 'order' => 1, 'label' => 'Workspaces', 'action' => 'drive/workspaces'],
         ]],
+        [
+            'name' => 'footer',
+            'position' => 'footer',
+            'items' => [
+                ['type' => 'route', 'position' => 1, 'label' => 'Developers', 'action' => '/api-docs', 'condition' => 'auth'],
+                ['type' => 'route', 'position' => 2, 'label' => 'Privacy Policy', 'action' => '/pages/1/privacy-policy'],
+                ['type' => 'route', 'position' => 3, 'label' => 'Terms of Service', 'action' => '/pages/2/terms-of-service'],
+                ['type' => 'route', 'position' => 4, 'label' => 'Contact Us', 'action' => '/contact']
+            ],
+        ],
+        [
+            'name' => 'Footer Social',
+            'position' => 'footer-secondary',
+            'items' => [
+                ['type' => 'link', 'position' => 1, 'icon' => 'facebook-square', 'action' => 'https://facebook.com'],
+                ['type' => 'link', 'position' => 2, 'icon' => 'twitter', 'action' => 'https://twitter.com'],
+                ['type' => 'link', 'position' => 3, 'icon' => 'instagram', 'action' => 'https://instagram.com'],
+                ['type' => 'link', 'position' => 4, 'icon' => 'youtube', 'action' => 'https://youtube.com'],
+            ],
+        ]
     ])],
 
     //uploads
@@ -49,17 +69,17 @@ return [
             [
                 'title' => 'Store any file',
                 'subtitle' => 'Keep photos, stories, designs, drawings, recordings, videos, and more. Your first 15 GB of storage are free.',
-                'image' => 'client/assets/images/homepage/inline-feature-1.png'
+                'image' => 'upload.svg'
             ],
             [
                 'title' => 'See your stuff anywhere',
                 'subtitle' => 'Your files in BeDrive can be reached from any smartphone, tablet, or computer.',
-                'image' => 'client/assets/images/homepage/inline-feature-2.png'
+                'image' => 'web-devices.svg'
             ],
             [
                 'title' => 'Share files and folders',
                 'subtitle' => 'You can quickly invite others to view, download, and collaborate on all the files you want.',
-                'image' => 'client/assets/images/homepage/inline-feature-3.png'
+                'image' => 'share.svg'
             ]
         ],
         'secondaryFeatures' => [

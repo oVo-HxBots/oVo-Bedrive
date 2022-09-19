@@ -2,6 +2,7 @@
 
 use App\User;
 use Arr;
+use Auth;
 use Carbon\Carbon;
 use Common\Auth\Permissions\Permission;
 use Common\Auth\Permissions\Traits\HasPermissionsRelation;
@@ -14,6 +15,7 @@ use Common\Files\FileEntry;
 use Common\Files\FileEntryPivot;
 use Common\Files\Traits\SetsAvailableSpaceAttribute;
 use Common\Notifications\NotificationSubscription;
+use Common\Search\Searchable;
 use Common\Settings\Settings;
 use Eloquent;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -59,11 +61,22 @@ use Illuminate\Notifications\Notifiable;
  */
 abstract class BaseUser extends Authenticatable
 {
-    use Notifiable, Billable, SetsAvailableSpaceAttribute, HasPermissionsRelation, HasAvatarAttribute, HasDisplayNameAttribute;
+    use Searchable,
+        Notifiable,
+        Billable,
+        SetsAvailableSpaceAttribute,
+        HasPermissionsRelation,
+        HasAvatarAttribute,
+        HasDisplayNameAttribute;
 
     // prevent avatar from being set along with other user details
     protected $guarded = ['id', 'avatar'];
-    protected $hidden = ['password', 'remember_token', 'pivot', 'legacy_permissions', 'api_token'];
+    protected $hidden = [
+        'password',
+        'remember_token',
+        'pivot',
+        'legacy_permissions',
+    ];
     protected $casts = [
         'id' => 'integer',
         'available_space' => 'integer',
@@ -77,6 +90,38 @@ abstract class BaseUser extends Authenticatable
     {
         parent::__construct($attributes);
         $this->billingEnabled = app(Settings::class)->get('billing.enable');
+    }
+
+    public function toArray()
+    {
+        if (
+            !Auth::id() ||
+            (Auth::id() !== $this->id &&
+                !Auth::user()->hasPermission('users.update'))
+        ) {
+            $this->hidden = array_merge($this->hidden, [
+                'first_name',
+                'last_name',
+                'avatar_url',
+                'gender',
+                'email',
+                'card_brand',
+                'has_password',
+                'confirmed',
+                'stripe_id',
+                'roles',
+                'permissions',
+                'card_last_four',
+                'created_at',
+                'updated_at',
+                'available_space',
+                'email_verified_at',
+                'timezone',
+                'confirmation_code',
+                'subscriptions',
+            ]);
+        }
+        return parent::toArray();
     }
 
     /**
@@ -102,9 +147,15 @@ abstract class BaseUser extends Authenticatable
      */
     public function scopeWhereNeedsNotificationFor(Builder $query, $notifId)
     {
-        return $query->whereHas('notificationSubscriptions', function(Builder $builder) use ($notifId) {
+        return $query->whereHas('notificationSubscriptions', function (
+            Builder $builder
+        ) use ($notifId) {
             if (\Str::contains($notifId, '*')) {
-                return $builder->where('notif_id', 'like', str_replace('*', '%', $notifId));
+                return $builder->where(
+                    'notif_id',
+                    'like',
+                    str_replace('*', '%', $notifId),
+                );
             } else {
                 return $builder->where('notif_id', $notifId);
             }
@@ -114,7 +165,8 @@ abstract class BaseUser extends Authenticatable
     /**
      * @return HasMany
      */
-    public function notificationSubscriptions() {
+    public function notificationSubscriptions()
+    {
         return $this->hasMany(NotificationSubscription::class);
     }
 
@@ -124,7 +176,13 @@ abstract class BaseUser extends Authenticatable
      */
     public function entries($options = ['owner' => true])
     {
-        $query = $this->morphToMany(FileEntry::class, 'model', 'file_entry_models', 'model_id', 'file_entry_id')
+        $query = $this->morphToMany(
+            FileEntry::class,
+            'model',
+            'file_entry_models',
+            'model_id',
+            'file_entry_id',
+        )
             ->using(FileEntryPivot::class)
             ->withPivot('owner', 'permissions');
 
@@ -132,7 +190,9 @@ abstract class BaseUser extends Authenticatable
             $query->wherePivot('owner', true);
         }
 
-        return $query->withTimestamps()->orderBy('file_entry_models.created_at', 'asc');
+        return $query
+            ->withTimestamps()
+            ->orderBy('file_entry_models.created_at', 'asc');
     }
 
     /**
@@ -152,44 +212,60 @@ abstract class BaseUser extends Authenticatable
      */
     public function getHasPasswordAttribute()
     {
-        return isset($this->attributes['password']) && $this->attributes['password'];
+        return isset($this->attributes['password']) &&
+            $this->attributes['password'];
     }
-
-
 
     /**
      * @return self
      */
     public function loadPermissions($force = false)
     {
-        if ( !$force && $this->relationLoaded('permissions')) {
+        if (!$force && $this->relationLoaded('permissions')) {
             return $this;
         }
 
         $query = app(Permission::class)
-            ->join('permissionables', 'permissions.id', 'permissionables.permission_id')
-            ->where(['permissionable_id' => $this->id, 'permissionable_type' => User::class]);
+            ->join(
+                'permissionables',
+                'permissions.id',
+                'permissionables.permission_id',
+            )
+            ->where([
+                'permissionable_id' => $this->id,
+                'permissionable_type' => User::class,
+            ]);
 
         if ($this->roles->pluck('id')->isNotEmpty()) {
-            $query->orWhere(function(Builder $builder) {
-                return $builder->whereIn('permissionable_id', $this->roles->pluck('id'))
+            $query->orWhere(function (Builder $builder) {
+                return $builder
+                    ->whereIn('permissionable_id', $this->roles->pluck('id'))
                     ->where('permissionable_type', Role::class);
             });
         }
 
         if ($plan = $this->getBillingPlan(true)) {
-            $query->orWhere(function(Builder $builder) use($plan) {
-                return $builder->where('permissionable_id', $plan->id)
+            $query->orWhere(function (Builder $builder) use ($plan) {
+                return $builder
+                    ->where('permissionable_id', $plan->id)
                     ->where('permissionable_type', BillingPlan::class);
             });
         }
 
-        $permissions = $query->select(['permissions.id', 'name', 'permissionables.restrictions', 'permissionable_type'])
+        $permissions = $query
+            ->select([
+                'permissions.id',
+                'name',
+                'permissionables.restrictions',
+                'permissionable_type',
+            ])
             ->get()
-            ->sortBy(function($value) {
+            ->sortBy(function ($value) {
                 if ($value['permissionable_type'] === User::class) {
                     return 1;
-                } else if ($value['permissionable_type'] === BillingPlan::class) {
+                } elseif (
+                    $value['permissionable_type'] === BillingPlan::class
+                ) {
                     return 2;
                 } else {
                     return 3;
@@ -198,10 +274,14 @@ abstract class BaseUser extends Authenticatable
             ->groupBy('id')
 
             // merge restrictions from all permissions
-            ->map(function(Collection $group) {
-                return $group->reduce(function(Permission $carry, Permission $permission) {
+            ->map(function (Collection $group) {
+                return $group->reduce(function (
+                    Permission $carry,
+                    Permission $permission
+                ) {
                     return $carry->mergeRestrictions($permission);
-                }, $group[0]);
+                },
+                $group[0]);
             });
 
         $this->setRelation('permissions', $permissions->values());
@@ -211,9 +291,13 @@ abstract class BaseUser extends Authenticatable
 
     public function getBillingPlan($parent = false): ?BillingPlan
     {
-        if ( ! $this->billingEnabled) return null;
+        if (!$this->billingEnabled) {
+            return null;
+        }
 
-        if ($subscription = $this->subscriptions->first()) {
+        $subscription = $this->subscriptions->first();
+
+        if ($subscription && $subscription->valid()) {
             return $parent ? $subscription->mainPlan() : $subscription->plan;
         } else {
             return BillingPlan::where('free', true)->first();
@@ -228,7 +312,9 @@ abstract class BaseUser extends Authenticatable
     public function getRestrictionValue($permissionName, $restriction)
     {
         $permission = $this->getPermission($permissionName);
-        return $permission ? $permission->getRestrictionValue($restriction) : null;
+        return $permission
+            ? $permission->getRestrictionValue($restriction)
+            : null;
     }
 
     /**
@@ -237,7 +323,14 @@ abstract class BaseUser extends Authenticatable
      */
     public function scopeCompact(Builder $query)
     {
-        return $query->select('users.id', 'users.avatar', 'users.email', 'users.first_name', 'users.last_name', 'users.username');
+        return $query->select(
+            'users.id',
+            'users.avatar',
+            'users.email',
+            'users.first_name',
+            'users.last_name',
+            'users.username',
+        );
     }
 
     /**
@@ -248,7 +341,7 @@ abstract class BaseUser extends Authenticatable
      */
     public function sendPasswordResetNotification($token)
     {
-        ResetPassword::$createUrlCallback = function($user, $token) {
+        ResetPassword::$createUrlCallback = function ($user, $token) {
             return url("password/reset/$token");
         };
         $this->notify(new ResetPassword($token));
@@ -256,8 +349,32 @@ abstract class BaseUser extends Authenticatable
 
     public static function findAdmin(): ?self
     {
-        return (new static)->whereHas('permissions', function(Builder $query) {
-            $query->where('name', 'admin');
-        })->first();
+        return (new static())
+            ->whereHas('permissions', function (Builder $query) {
+                $query->where('name', 'admin');
+            })
+            ->first();
+    }
+
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'username' => $this->username,
+            'first_name' => $this->first_name,
+            'last_name' => $this->last_name,
+            'email' => $this->email,
+            'created_at' => $this->created_at->timestamp ?? '_null',
+            'updated_at' => $this->updated_at->timestamp ?? '_null',
+        ];
+    }
+
+    public static function filterableFields(): array
+    {
+        return [
+            'id',
+            'created_at',
+            'updated_at',
+        ];
     }
 }

@@ -7,6 +7,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use SplFileInfo;
 use stdClass;
+use Symfony\Component\VarDumper\VarDumper;
 
 trait InteractsWithInput
 {
@@ -111,12 +112,17 @@ trait InteractsWithInput
      *
      * @param  string  $key
      * @param  callable  $callback
+     * @param  callable|null  $default
      * @return $this|mixed
      */
-    public function whenHas($key, callable $callback)
+    public function whenHas($key, callable $callback, callable $default = null)
     {
         if ($this->has($key)) {
             return $callback(data_get($this->all(), $key)) ?: $this;
+        }
+
+        if ($default) {
+            return $default();
         }
 
         return $this;
@@ -184,12 +190,17 @@ trait InteractsWithInput
      *
      * @param  string  $key
      * @param  callable  $callback
+     * @param  callable|null  $default
      * @return $this|mixed
      */
-    public function whenFilled($key, callable $callback)
+    public function whenFilled($key, callable $callback, callable $default = null)
     {
         if ($this->filled($key)) {
             return $callback(data_get($this->all(), $key)) ?: $this;
+        }
+
+        if ($default) {
+            return $default();
         }
 
         return $this;
@@ -461,5 +472,35 @@ trait InteractsWithInput
         }
 
         return $this->$source->get($key, $default);
+    }
+
+    /**
+     * Dump the request items and end the script.
+     *
+     * @param  array|mixed  $keys
+     * @return void
+     */
+    public function dd(...$keys)
+    {
+        $keys = is_array($keys) ? $keys : func_get_args();
+
+        call_user_func_array([$this, 'dump'], $keys);
+
+        exit(1);
+    }
+
+    /**
+     * Dump the items.
+     *
+     * @param  array  $keys
+     * @return $this
+     */
+    public function dump($keys = [])
+    {
+        $keys = is_array($keys) ? $keys : func_get_args();
+
+        VarDumper::dump(count($keys) > 0 ? $this->only($keys) : $this->all());
+
+        return $this;
     }
 }

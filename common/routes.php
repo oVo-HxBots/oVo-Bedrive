@@ -1,9 +1,16 @@
 <?php
 
+use Common\Search\SearchSettingsController;
 use Common\Auth\Controllers\AccessTokenController;
+use Common\Auth\Controllers\UserController;
+use Common\Csv\BaseCsvExportController;
+use Common\Csv\CommonCsvExportController;
+use Common\Domains\CustomDomainController;
+use Common\Files\Controllers\FileEntriesController;
 use Common\Workspaces\Controllers\WorkspaceController;
 use Common\Workspaces\Controllers\WorkspaceInvitesController;
 use Common\Workspaces\Controllers\WorkspaceMembersController;
+use Common\Workspaces\UserWorkspacesController;
 
 Route::group(['prefix' => 'secure', 'middleware' => 'web'], function () {
     //BOOTSTRAP
@@ -25,14 +32,17 @@ Route::group(['prefix' => 'secure', 'middleware' => 'web'], function () {
     //SOCIAL AUTHENTICATION
     Route::get('auth/social/{provider}/connect', 'Common\Auth\Controllers\SocialAuthController@connect');
     Route::get('auth/social/{provider}/login', 'Common\Auth\Controllers\SocialAuthController@login');
+    Route::get('auth/social/{provider}/retrieve-profile', 'Common\Auth\Controllers\SocialAuthController@retrieveProfile');
     Route::get('auth/social/{provider}/callback', 'Common\Auth\Controllers\SocialAuthController@loginCallback');
     Route::post('auth/social/extra-credentials', 'Common\Auth\Controllers\SocialAuthController@extraCredentials');
     Route::post('auth/social/{provider}/disconnect', 'Common\Auth\Controllers\SocialAuthController@disconnect');
 
     //USERS
-    Route::apiResource('users', 'Common\Auth\Controllers\UserController');
+    Route::apiResource('users', UserController::class)->except(['destroy']);
+    Route::delete('users/{ids}', [UserController::class, 'destroy']);
     Route::post('access-tokens', [AccessTokenController::class, 'store']);
     Route::delete('access-tokens/{tokenId}', [AccessTokenController::class, 'destroy']);
+    Route::post('users/csv/export', [CommonCsvExportController::class, 'exportUsers']);
 
     //ROLES
     Route::get('roles', 'Common\Auth\Roles\RolesController@index');
@@ -66,6 +76,7 @@ Route::group(['prefix' => 'secure', 'middleware' => 'web'], function () {
     Route::get('uploads', 'Common\Files\Controllers\FileEntriesController@index');
     Route::get('uploads/download', 'Common\Files\Controllers\DownloadFileController@download');
     Route::post('uploads/images', 'Common\Files\Controllers\PublicUploadsController@images');
+    Route::delete('uploads/images', [FileEntriesController::class, 'destroy']);
     Route::post('uploads/videos', 'Common\Files\Controllers\PublicUploadsController@videos');
     Route::post('uploads/favicon', 'Common\Files\Controllers\UploadFaviconController@store');
     Route::get('uploads/{id}', 'Common\Files\Controllers\FileEntriesController@show');
@@ -104,6 +115,8 @@ Route::group(['prefix' => 'secure', 'middleware' => 'web'], function () {
 
     //OTHER ADMIN ROUTES
     Route::get('admin/analytics/stats', 'Common\Admin\Analytics\AnalyticsController@stats');
+    Route::get('admin/search/models', [SearchSettingsController::class, 'getSearchableModels']);
+    Route::post('admin/search/import', [SearchSettingsController::class, 'import']);
     Route::post('cache/flush', 'Common\Admin\CacheController@flush');
 
     //billing plans
@@ -142,6 +155,7 @@ Route::group(['prefix' => 'secure', 'middleware' => 'web'], function () {
 
     // WORKSPACE
     Route::apiResource('workspace', WorkspaceController::class);
+    Route::get('me/workspaces', [UserWorkspacesController::class, 'index']);
     Route::get('workspace/join/{workspaceInvite}', [WorkspaceMembersController::class, 'join']);
     Route::delete('workspace/{workspace}/member/{userId}', [WorkspaceMembersController::class, 'destroy']);
     Route::post('workspace/{workspace}/invite', [WorkspaceInvitesController::class, 'store']);
@@ -152,6 +166,7 @@ Route::group(['prefix' => 'secure', 'middleware' => 'web'], function () {
 
     // COMMENTS
     Route::apiResource('comment', 'Common\Comments\CommentController');
+    Route::post('comment/restore', 'Common\Comments\CommentController@restore');
 
     // contact us page
     Route::post('contact-page', 'Common\Pages\ContactPageController@sendMessage');
@@ -159,6 +174,9 @@ Route::group(['prefix' => 'secure', 'middleware' => 'web'], function () {
 
     // SITEMAP
     Route::post('sitemap/generate', 'Common\Admin\Sitemap\SitemapController@generate');
+
+    // CSV
+    Route::get('csv/download/{csvExport}', [BaseCsvExportController::class, 'download']);
 });
 
 // no need for "secure" prefix here, but need "web" middleware
@@ -187,8 +205,8 @@ Route::post('secure/password/check', 'Common\Validation\CheckPasswordController@
 
 // CUSTOM DOMAIN
 Route::group(['prefix' => 'secure', 'middleware' => 'customDomainsEnabled'], function() {
-    Route::post('custom-domain/validate/2BrM45vvfS/api', 'Common\Domains\CustomDomainController@validateDomainApi');
-    Route::get('custom-domain/validate/2BrM45vvfS', 'Common\Domains\CustomDomainController@validateDomain');
+    Route::post('custom-domain/validate/2BrM45vvfS/api', [CustomDomainController::class, 'validateDomainApi']);
+    Route::get('custom-domain/validate/2BrM45vvfS', [CustomDomainController::class, 'validateDomain']);
 });
 
 // PAYPAL

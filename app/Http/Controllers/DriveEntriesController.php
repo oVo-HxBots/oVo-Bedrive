@@ -20,22 +20,13 @@ class DriveEntriesController extends FileEntriesController
      */
     protected $entry;
 
-    /**
-     * @param Request $request
-     * @param FileEntry $entry
-     */
-    public function __construct(
-        Request $request,
-        FileEntry $entry
-    ) {
+    public function __construct(Request $request, FileEntry $entry)
+    {
         parent::__construct($request, $entry);
         $this->request = $request;
         $this->entry = $entry;
     }
 
-    /**
-     * @return array
-     */
     public function index()
     {
         $params = $this->request->all();

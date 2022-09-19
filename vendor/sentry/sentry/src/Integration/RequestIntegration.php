@@ -12,7 +12,10 @@ use Sentry\Exception\JsonException;
 use Sentry\Options;
 use Sentry\SentrySdk;
 use Sentry\State\Scope;
+use Sentry\UserDataBag;
 use Sentry\Util\JSON;
+use Symfony\Component\OptionsResolver\Options as SymfonyOptions;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * This integration collects information from the request and attaches them to
@@ -48,9 +51,16 @@ final class RequestIntegration implements IntegrationInterface
     ];
 
     /**
-     * @var Options|null The client options
+     * This constant defines the default list of headers that may contain
+     * sensitive data and that will be sanitized if sending PII is disabled.
      */
-    private $options;
+    private const DEFAULT_SENSITIVE_HEADERS = [
+        'Authorization',
+        'Cookie',
+        'Set-Cookie',
+        'X-Forwarded-For',
+        'X-Real-IP',
+    ];
 
     /**
      * @var RequestFetcherInterface PSR-7 request fetcher
@@ -58,19 +68,28 @@ final class RequestIntegration implements IntegrationInterface
     private $requestFetcher;
 
     /**
+     * @var array<string, mixed> The options
+     */
+    private $options;
+
+    /**
      * Constructor.
      *
-     * @param Options|null                 $options        The client options
      * @param RequestFetcherInterface|null $requestFetcher PSR-7 request fetcher
+     * @param array<string, mixed>         $options        The options
+     *
+     * @psalm-param array{
+     *     pii_sanitize_headers?: string[]
+     * } $options
      */
-    public function __construct(?Options $options = null, ?RequestFetcherInterface $requestFetcher = null)
+    public function __construct(?RequestFetcherInterface $requestFetcher = null, array $options = [])
     {
-        if (null !== $options) {
-            @trigger_error(sprintf('Passing the options as argument of the constructor of the "%s" class is deprecated since version 2.1 and will not work in 3.0.', self::class), \E_USER_DEPRECATED);
-        }
+        $resolver = new OptionsResolver();
 
-        $this->options = $options;
+        $this->configureOptions($resolver);
+
         $this->requestFetcher = $requestFetcher ?? new RequestFetcher();
+        $this->options = $resolver->resolve($options);
     }
 
     /**
@@ -89,37 +108,15 @@ final class RequestIntegration implements IntegrationInterface
                 return $event;
             }
 
-            $this->processEvent($event, $this->options ?? $client->getOptions());
+            $this->processEvent($event, $client->getOptions());
 
             return $event;
         });
     }
 
-    /**
-     * Applies the information gathered by the this integration to the event.
-     *
-     * @param self                        $self    The current instance of the integration
-     * @param Event                       $event   The event that will be enriched with a request
-     * @param ServerRequestInterface|null $request The Request that will be processed and added to the event
-     *
-     * @deprecated since version 2.1, to be removed in 3.0
-     */
-    public static function applyToEvent(self $self, Event $event, ?ServerRequestInterface $request = null): void
+    private function processEvent(Event $event, Options $options): void
     {
-        @trigger_error(sprintf('The "%s" method is deprecated since version 2.1 and will be removed in 3.0.', __METHOD__), \E_USER_DEPRECATED);
-
-        if (null === $self->options) {
-            throw new \BadMethodCallException('The options of the integration must be set.');
-        }
-
-        $self->processEvent($event, $self->options, $request);
-    }
-
-    private function processEvent(Event $event, Options $options, ?ServerRequestInterface $request = null): void
-    {
-        if (null === $request) {
-            $request = $this->requestFetcher->fetchRequest();
-        }
+        $request = $this->requestFetcher->fetchRequest();
 
         if (null === $request) {
             return;
@@ -138,19 +135,22 @@ final class RequestIntegration implements IntegrationInterface
             $serverParams = $request->getServerParams();
 
             if (isset($serverParams['REMOTE_ADDR'])) {
+                $user = $event->getUser();
                 $requestData['env']['REMOTE_ADDR'] = $serverParams['REMOTE_ADDR'];
+
+                if (null === $user) {
+                    $user = UserDataBag::createFromUserIpAddress($serverParams['REMOTE_ADDR']);
+                } elseif (null === $user->getIpAddress()) {
+                    $user->setIpAddress($serverParams['REMOTE_ADDR']);
+                }
+
+                $event->setUser($user);
             }
 
             $requestData['cookies'] = $request->getCookieParams();
             $requestData['headers'] = $request->getHeaders();
-
-            $userContext = $event->getUserContext();
-
-            if (null === $userContext->getIpAddress() && isset($serverParams['REMOTE_ADDR'])) {
-                $userContext->setIpAddress($serverParams['REMOTE_ADDR']);
-            }
         } else {
-            $requestData['headers'] = $this->removePiiFromHeaders($request->getHeaders());
+            $requestData['headers'] = $this->sanitizeHeaders($request->getHeaders());
         }
 
         $requestBody = $this->captureRequestBody($options, $request);
@@ -165,21 +165,23 @@ final class RequestIntegration implements IntegrationInterface
     /**
      * Removes headers containing potential PII.
      *
-     * @param array<string, array<int, string>> $headers Array containing request headers
+     * @param array<string, string[]> $headers Array containing request headers
      *
-     * @return array<string, array<int, string>>
+     * @return array<string, string[]>
      */
-    private function removePiiFromHeaders(array $headers): array
+    private function sanitizeHeaders(array $headers): array
     {
-        $keysToRemove = ['authorization', 'cookie', 'set-cookie', 'remote_addr'];
+        foreach ($headers as $name => $values) {
+            if (!\in_array(strtolower($name), $this->options['pii_sanitize_headers'], true)) {
+                continue;
+            }
 
-        return array_filter(
-            $headers,
-            static function (string $key) use ($keysToRemove): bool {
-                return !\in_array(strtolower($key), $keysToRemove, true);
-            },
-            \ARRAY_FILTER_USE_KEY
-        );
+            foreach ($values as $headerLine => $headerValue) {
+                $headers[$name][$headerLine] = '[Filtered]';
+            }
+        }
+
+        return $headers;
     }
 
     /**
@@ -273,5 +275,19 @@ final class RequestIntegration implements IntegrationInterface
         }
 
         return true;
+    }
+
+    /**
+     * Configures the options of the client.
+     *
+     * @param OptionsResolver $resolver The resolver for the options
+     */
+    private function configureOptions(OptionsResolver $resolver): void
+    {
+        $resolver->setDefault('pii_sanitize_headers', self::DEFAULT_SENSITIVE_HEADERS);
+        $resolver->setAllowedTypes('pii_sanitize_headers', 'string[]');
+        $resolver->setNormalizer('pii_sanitize_headers', static function (SymfonyOptions $options, array $value): array {
+            return array_map('strtolower', $value);
+        });
     }
 }

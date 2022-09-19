@@ -25,10 +25,6 @@ class UserAvatarController extends BaseController {
      */
     private $storage;
 
-    /**
-     * @param Request $request
-     * @param User $user
-     */
     public function __construct(Request $request, User $user)
     {
         $this->request = $request;
@@ -36,11 +32,7 @@ class UserAvatarController extends BaseController {
         $this->user = $user;
     }
 
-    /**
-     * @param int $userId
-     * @return JsonResponse
-     */
-    public function store($userId) {
+    public function store(int $userId) {
 
         $user = $this->user->findOrFail($userId);
 

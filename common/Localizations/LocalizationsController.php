@@ -18,10 +18,6 @@ class LocalizationsController extends BaseController
      */
     private $repository;
 
-    /**
-     * @param Request $request
-     * @param LocalizationsRepository $repository
-     */
     public function __construct(Request $request, LocalizationsRepository $repository)
     {
         $this->request = $request;

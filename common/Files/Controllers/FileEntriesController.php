@@ -1,9 +1,9 @@
 <?php namespace Common\Files\Controllers;
 
-use App;
+use Arr;
 use Auth;
 use Common\Core\BaseController;
-use Common\Database\Paginator;
+use Common\Database\Datasource\MysqlDataSource;
 use Common\Files\Actions\Deletion\DeleteEntries;
 use Common\Files\Actions\UploadFile;
 use Common\Files\FileEntry;
@@ -11,13 +11,11 @@ use Common\Files\Requests\UploadFileRequest;
 use Common\Files\Response\FileResponseFactory;
 use Common\Files\Traits\TransformsFileEntryResponse;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Arr;
 
-class FileEntriesController extends BaseController {
-
+class FileEntriesController extends BaseController
+{
     use TransformsFileEntryResponse;
 
     /**
@@ -30,19 +28,12 @@ class FileEntriesController extends BaseController {
      */
     protected $entry;
 
-    /**
-     * @param Request $request
-     * @param FileEntry $entry
-     */
     public function __construct(Request $request, FileEntry $entry)
     {
         $this->request = $request;
         $this->entry = $entry;
     }
 
-    /**
-     * @return JsonResponse
-     */
     public function index()
     {
         $params = $this->request->all();
@@ -50,15 +41,12 @@ class FileEntriesController extends BaseController {
 
         $this->authorize('index', FileEntry::class);
 
-        $paginator = (new Paginator($this->entry, $params));
+        $dataSource = new MysqlDataSource(
+            $this->entry->with(['users']),
+            $params,
+        );
 
-        $paginator->filterColumns = ['type', 'public', 'password', 'created_at', 'owner' => function(Builder $builder, $userId) {
-            if ($userId) {
-                $builder->whereOwner($userId);
-            }
-        }];
-
-        $pagination = $paginator->with('users')->paginate();
+        $pagination = $dataSource->paginate();
 
         return $this->success(['pagination' => $pagination]);
     }
@@ -94,11 +82,18 @@ class FileEntriesController extends BaseController {
         $this->authorize('store', [FileEntry::class, $parentId]);
 
         $params = $this->request->except('file');
-        $fileEntry = app(UploadFile::class)
-            ->execute(Arr::get($params, 'disk', 'private'), $uploadedFile, $params);
+        $fileEntry = app(UploadFile::class)->execute(
+            Arr::get($params, 'disk', 'private'),
+            $uploadedFile,
+            $params,
+        );
 
         return $this->success(
-            $this->transformFileEntryResponse(['fileEntry' => $fileEntry->load('users')], $params), 201
+            $this->transformFileEntryResponse(
+                ['fileEntry' => $fileEntry->load('users')],
+                $params,
+            ),
+            201,
         );
     }
 
@@ -120,22 +115,25 @@ class FileEntriesController extends BaseController {
 
         $entry->fill($params)->update();
 
-        return $this->success($this->transformFileEntryResponse(['fileEntry' => $entry->load('users')], $params));
+        return $this->success(
+            $this->transformFileEntryResponse(
+                ['fileEntry' => $entry->load('users')],
+                $params,
+            ),
+        );
     }
 
-    /**
-     * @return JsonResponse
-     */
     public function destroy()
     {
         $entryIds = $this->request->get('entryIds');
         $userId = Auth::user()->id;
 
         $this->validate($this->request, [
-            'entryIds' => 'requiredWithoutAll:emptyTrash,paths|array|exists:file_entries,id',
+            'entryIds' =>
+                'requiredWithoutAll:emptyTrash,paths|array|exists:file_entries,id',
             'paths' => 'requiredWithoutAll:emptyTrash,entryIds|array',
             'deleteForever' => 'boolean',
-            'emptyTrash' => 'boolean'
+            'emptyTrash' => 'boolean',
         ]);
 
         // get all soft deleted entries for user, if we are emptying trash
@@ -150,7 +148,9 @@ class FileEntriesController extends BaseController {
         app(DeleteEntries::class)->execute([
             'paths' => $this->request->get('paths'),
             'entryIds' => $entryIds,
-            'soft' => !$this->request->get('deleteForever') && !$this->request->get('emptyTrash'),
+            'soft' =>
+                !$this->request->get('deleteForever') &&
+                !$this->request->get('emptyTrash'),
         ]);
 
         return $this->success();

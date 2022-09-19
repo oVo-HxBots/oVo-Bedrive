@@ -28,7 +28,8 @@ class CreateUsersTable extends Migration {
             $table->string('card_brand', 30)->nullable();
             $table->string('card_last_four', 4)->nullable();
 			$table->rememberToken();
-			$table->timestamps();
+            $table->timestamp('created_at')->index()->nullable();
+            $table->timestamp('updated_at')->index()->nullable();
 
             $table->collation = config('database.connections.mysql.collation');
             $table->charset = config('database.connections.mysql.charset');

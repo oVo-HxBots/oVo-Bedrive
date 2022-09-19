@@ -40,3 +40,12 @@ if (! function_exists('castToBoolean')) {
         }
     }
 }
+
+if ( ! function_exists('modelTypeToNamespace')) {
+    function modelTypeToNamespace(string $modelType): string {
+        if (Str::contains($modelType, 'App')) {
+            return $modelType;
+        }
+        return 'App\\' . ucfirst($modelType);
+    }
+}

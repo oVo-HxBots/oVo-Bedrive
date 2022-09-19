@@ -5,9 +5,11 @@ use Common\Auth\Events\UserCreated;
 use Common\Auth\Events\UsersDeleted;
 use Common\Auth\Permissions\Traits\SyncsPermissions;
 use Common\Auth\Roles\Role;
+use Common\Billing\Subscription;
 use Common\Domains\Actions\DeleteCustomDomains;
 use Common\Domains\CustomDomain;
 use Common\Files\Actions\Deletion\PermanentlyDeleteEntries;
+use Common\Pages\CustomPage;
 use Common\Settings\Settings;
 use Exception;
 use Arr;
@@ -88,7 +90,6 @@ class UserRepository {
     public function create($params)
     {
         /** @var User $user */
-        $params['api_token'] = Str::random(40);
         $user = $this->user->forceCreate($this->formatParams($params));
 
         try {
@@ -148,7 +149,9 @@ class UserRepository {
             $user->permissions()->detach();
 
             if ($user->subscribed()) {
-                $user->subscriptions->each->cancelAndDelete();
+                $user->subscriptions->each(function(Subscription $subscription) {
+                    $subscription->cancelAndDelete();
+                });
             }
 
             $user->delete();
@@ -157,8 +160,12 @@ class UserRepository {
             app(PermanentlyDeleteEntries::class)->execute($entryIds);
         });
 
+        // delete domains
         $domainIds = app(CustomDomain::class)->whereIn('user_id', $ids)->pluck('id');
         app(DeleteCustomDomains::class)->execute($domainIds->toArray());
+
+        // delete custom pages
+        CustomPage::whereIn('user_id', $ids)->delete();
 
         event(new UsersDeleted($users));
 
@@ -182,12 +189,12 @@ class UserRepository {
             'timezone'    => isset($params['timezone']) ? $params['timezone'] : null,
         ];
 
-        if (isset($params['api_token'])) {
-            $formatted['api_token'] = $params['api_token'];
-        }
-
         if (isset($params['email_verified_at'])) {
             $formatted['email_verified_at'] = $params['email_verified_at'];
+        }
+
+        if (isset($params['avatar'])) {
+            $formatted['avatar'] = $params['avatar'];
         }
 
         if (array_key_exists('available_space', $params)) {

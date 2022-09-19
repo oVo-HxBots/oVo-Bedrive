@@ -1,5 +1,6 @@
 <?php namespace Common\Core\Values;
 
+use Arr;
 use Auth;
 use Common\Admin\Appearance\Themes\CssTheme;
 use Common\Auth\Permissions\Permission;
@@ -11,7 +12,6 @@ use Common\Pages\CustomPage;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Filesystem\Filesystem;
-use Arr;
 use Illuminate\Support\Collection;
 use Str;
 use const App\Providers\WORKSPACED_RESOURCES;
@@ -28,10 +28,6 @@ class ValueLists
      */
     private $localization;
 
-    /**
-     * @param Filesystem $fs
-     * @param Localization $localization
-     */
     public function __construct(Filesystem $fs, Localization $localization)
     {
         $this->fs = $fs;
@@ -69,6 +65,10 @@ class ValueLists
         if ( ! config('common.site.notifications_integrated')) {
             $query->where('group', '!=', 'notifications');
         }
+
+        // TODO: fetch and merge advanced and description from config files here
+        // instead of storing in db. Then can override workspace descriptions and
+        // advanced state easily here from separate config file
 
         if ( ! config('common.site.workspaces_integrated')) {
             $query->where('group', '!=', 'workspaces')
@@ -145,6 +145,10 @@ class ValueLists
     public function localizations()
     {
         return $this->localization->get(['id', 'name', 'language']);
+    }
+
+    public function googleFonts() {
+        return json_decode($this->fs->get(__DIR__ . '/../../resources/lists/google-fonts.json'), true);
     }
 
     public function menuItemCategories()

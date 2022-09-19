@@ -8,6 +8,7 @@ use Common\Auth\Oauth;
 use Illuminate\Http\Request;
 use Common\Settings\Settings;
 use Common\Core\BaseController;
+use Session;
 
 class SocialAuthController extends BaseController
 {
@@ -52,7 +53,12 @@ class SocialAuthController extends BaseController
      */
     public function connect($provider)
     {
-        return $this->oauth->connect($provider);
+        return $this->oauth->connectCurrentUserTo($provider);
+    }
+
+    public function retrieveProfile(string $providerName)
+    {
+        return $this->oauth->retrieveProfileOnly($providerName);
     }
 
     /**
@@ -98,6 +104,11 @@ class SocialAuthController extends BaseController
 
         if ( ! $externalProfile) {
             return $this->oauth->getErrorResponse(__('Could not retrieve social sign in account.'));
+        }
+
+        if (Session::get(Oauth::RETRIEVE_PROFILE_ONLY_KEY)) {
+            Session::forget(Oauth::RETRIEVE_PROFILE_ONLY_KEY);
+            return $this->oauth->returnProfileData($externalProfile);
         }
 
         $existingProfile = $this->oauth->getExistingProfile($externalProfile);

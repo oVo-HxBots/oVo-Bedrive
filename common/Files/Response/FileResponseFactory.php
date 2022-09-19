@@ -8,11 +8,9 @@ use Request;
 class FileResponseFactory
 {
     /**
-     * @param FileEntry $entry
-     * @param string $disposition
      * @return mixed
      */
-    public function create(FileEntry $entry, $disposition = 'inline')
+    public function create(FileEntry $entry, string $disposition = 'inline')
     {
         $options = [
             'useThumbnail' => Request::get('thumbnail') && $entry->thumbnail,
@@ -23,12 +21,7 @@ class FileResponseFactory
             ->make($entry, $options);
     }
 
-    /**
-     * @param FileEntry $entry
-     * @param string $disposition
-     * @return FileResponse
-     */
-    private function resolveResponseClass(FileEntry $entry, $disposition = 'inline')
+    private function resolveResponseClass(FileEntry $entry, string $disposition = 'inline'): FileResponse
     {
         $isLocalDrive = $entry->getDisk()->getAdapter() instanceof Local;
         $staticFileDelivery = config('common.site.static_file_delivery');
@@ -48,16 +41,12 @@ class FileResponseFactory
         }
     }
 
-    /**
-     * @param FileEntry $entry
-     * @return bool
-     */
-    private function shouldReturnRangeResponse(FileEntry $entry)
+    private function shouldReturnRangeResponse(FileEntry $entry): bool
     {
         return $entry->type === 'video' || $entry->type === 'audio' || $entry->mime === 'application/ogg';
     }
 
-    private function shouldRedirectToRemoteUrl(FileEntry $entry)
+    private function shouldRedirectToRemoteUrl(FileEntry $entry): bool
     {
         $adapter = $entry->getDisk()->getAdapter();
         $isS3 = $adapter instanceof AwsS3Adapter;

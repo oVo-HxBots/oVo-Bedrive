@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Ramsey\Uuid\Uuid;
 
 /**
+ * Common\Notifications\NotificationSubscription
+ *
  * @property int $id
  * @property int $user_id
  * @property Carbon|null $created_at
@@ -15,6 +17,11 @@ use Ramsey\Uuid\Uuid;
  * @property string notif_id
  * @property array channels
  * @mixin Eloquent
+ * @property string $notif_id
+ * @property array $channels
+ * @method static \Illuminate\Database\Eloquent\Builder|NotificationSubscription newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|NotificationSubscription newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|NotificationSubscription query()
  */
 class NotificationSubscription extends Model
 {

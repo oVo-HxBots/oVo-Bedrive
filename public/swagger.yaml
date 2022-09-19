@@ -315,20 +315,22 @@ paths:
         - Files and Folders
       summary: Move entries to trash or delete permanently
       operationId: entriesDelete
-      parameters:
-        - in: query
-          name: entryIds
-          description: list of entry IDs to delete
-          schema:
-            type: array
-            items:
-              type: string
-        - in: query
-          name: deleteForever
-          description: Whether entries should be deleted permantently, instead of being moved to trash
-          schema:
-            type: string
-            example: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entryIds:
+                  description: list of entry IDs to delete
+                  type: array
+                  items:
+                    type: string
+                deleteForever:
+                  description: Whether entries should be deleted permantently, instead of being moved to trash
+                  type: string
+                  example: false
       responses:
         '200':
           description: Entries deleted successfully

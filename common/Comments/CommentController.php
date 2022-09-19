@@ -3,9 +3,10 @@
 namespace Common\Comments;
 
 use Common\Core\BaseController;
-use Common\Database\Paginator;
+use Common\Database\Datasource\MysqlDataSource;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\Response;
 
 class CommentController extends BaseController
 {
@@ -19,51 +20,35 @@ class CommentController extends BaseController
      */
     private $request;
 
-    /**
-     * @param Comment $comment
-     * @param Request $request
-     */
     public function __construct(Comment $comment, Request $request)
     {
         $this->comment = $comment;
         $this->request = $request;
     }
 
-    /**
-     * @return Response
-     */
-    public function index()
+    public function index(): Response
     {
         $userId = $this->request->get('userId');
         $this->authorize('index', [Comment::class, $userId]);
 
-        $paginator = new Paginator($this->comment, $this->request->all());
+        $dataSource = new MysqlDataSource(
+            $this->comment->with(['user']),
+            $this->request->all(),
+        );
 
-        if ($userId = $paginator->param('userId')) {
-            $paginator->where('user_id', $userId);
-        }
-
-        $pagination = $paginator->paginate();
+        $pagination = $dataSource->paginate();
 
         return $this->success(['pagination' => $pagination]);
     }
 
-    /**
-     * @param Comment $comment
-     * @return Response
-     */
-    public function show(Comment $comment)
+    public function show(Comment $comment): Response
     {
         $this->authorize('show', $comment);
 
         return $this->success(['comment' => $comment]);
     }
 
-    /**
-     * @param CrupdateCommentRequest $request
-     * @return Response
-     */
-    public function store(CrupdateCommentRequest $request)
+    public function store(CrupdateCommentRequest $request): Response
     {
         $this->authorize('store', Comment::class);
 
@@ -72,30 +57,73 @@ class CommentController extends BaseController
         return $this->success(['comment' => $comment]);
     }
 
-    /**
-     * @param Comment $comment
-     * @param CrupdateCommentRequest $request
-     * @return Response
-     */
-    public function update(Comment $comment, CrupdateCommentRequest $request)
-    {
+    public function update(
+        Comment $comment,
+        CrupdateCommentRequest $request
+    ): Response {
         $this->authorize('store', $comment);
 
-        $comment = app(CrupdateComment::class)->execute($request->all(), $comment);
+        $comment = app(CrupdateComment::class)->execute(
+            $request->all(),
+            $comment,
+        );
 
         return $this->success(['comment' => $comment]);
     }
 
-    /**
-     * @param string $ids
-     * @return Response
-     */
-    public function destroy($ids)
+    public function destroy(string $ids): Response
     {
         $commentIds = explode(',', $ids);
-        $this->authorize('store', [Comment::class, $commentIds]);
+        $this->authorize('destroy', [Comment::class, $commentIds]);
 
-        $this->comment->whereIn('id', $commentIds)->delete();
+        $allDeleted = [];
+        $allMarkedAsDeleted = [];
+
+        $this->comment
+            ->whereIn('id', $commentIds)
+            ->chunkById(100, function (Collection $comments) use (
+                &$allDeleted,
+                &$allMarkedAsDeleted
+            ) {
+                $toMarkAsDeleted = [];
+                $toDelete = [];
+                foreach ($comments as $comment) {
+                    if ($comment->allChildren()->count() > 1) {
+                        $toMarkAsDeleted[] = $comment->id;
+                    } else {
+                        $toDelete[] = $comment->id;
+                    }
+                }
+                if (!empty($toMarkAsDeleted)) {
+                    $this->comment
+                        ->whereIn('id', $toMarkAsDeleted)
+                        ->update(['deleted' => true]);
+                }
+                if (!empty($toDelete)) {
+                    $this->comment->whereIn('id', $toDelete)->delete();
+                }
+                $allDeleted = array_merge($allDeleted, $toDelete);
+                $allMarkedAsDeleted = array_merge(
+                    $allMarkedAsDeleted,
+                    $toMarkAsDeleted,
+                );
+            });
+
+        return $this->success([
+            'allDeleted' => $allDeleted,
+            'allMarkedAsDeleted' => $allMarkedAsDeleted,
+        ]);
+    }
+
+    public function restore()
+    {
+        $this->authorize('update', Comment::class);
+
+        $commentIds = $this->request->get('commentIds');
+
+        $this->comment
+            ->whereIn('id', $commentIds)
+            ->update(['deleted' => false]);
 
         return $this->success();
     }

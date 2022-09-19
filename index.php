@@ -1,7 +1,7 @@
 <?php
 
-if (version_compare(PHP_VERSION, '7.2.5') === -1) {
-    exit('You need at least PHP '.'7.2.5'.' to install this application.');
+if (version_compare(PHP_VERSION, '7.3') === -1) {
+    exit('You need at least PHP '.'7.3'.' to install this application.');
 }
 
 // if not installed yet, redirect to public dir

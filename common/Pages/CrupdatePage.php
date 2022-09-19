@@ -4,15 +4,11 @@ namespace Common\Pages;
 
 use Arr;
 use Auth;
+use Common\Workspaces\ActiveWorkspace;
 
 class CrupdatePage
 {
-    /**
-     * @param array $data
-     * @param CustomPage $page
-     * @return CustomPage
-     */
-    public function execute($page, $data)
+    public function execute(CustomPage $page, array $data): CustomPage
     {
         $attributes = [
             'title' => $data['title'],
@@ -20,6 +16,7 @@ class CrupdatePage
             'slug' => Arr::get($data, 'slug') ?: Arr::get($data, 'title'),
             'user_id' => Auth::id(),
             'hide_nav' => $data['hide_nav'] ?? false,
+            'workspace_id' => app(ActiveWorkspace::class)->id,
         ];
 
         $page->fill($attributes)->save();

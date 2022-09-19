@@ -1,7 +1,6 @@
 <?php namespace Common\Validation;
 
 use Common\Core\BaseController;
-use Common\Settings\Settings;
 use DB;
 use Hash;
 use Illuminate\Http\Request;
@@ -13,19 +12,9 @@ class CheckPasswordController extends BaseController
      */
     private $request;
 
-    /**
-     * @var Settings
-     */
-    private $settings;
-
-    /**
-     * @param Request $request
-     * @param Settings $settings
-     */
-    public function __construct(Request $request, Settings $settings)
+    public function __construct(Request $request)
     {
         $this->request = $request;
-        $this->settings = $settings;
     }
 
     public function check()

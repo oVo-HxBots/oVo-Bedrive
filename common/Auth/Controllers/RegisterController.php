@@ -73,7 +73,7 @@ class RegisterController extends BaseController
                 $response['bootstrapData'] = $bootstrapData->getEncoded();
             }
         } else {
-            $response['message'] = 'We have sent you an email with instructions on how to activate your account.';
+            $response['message'] = trans('We have sent you an email with instructions on how to activate your account.');
         }
 
         return $this->success($response);

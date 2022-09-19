@@ -2,11 +2,11 @@
 
 namespace App\Listeners;
 
+use App\Services\Entries\CreateFolder;
 use App\Services\Shares\AttachUsersToEntry;
 use Common\Auth\Events\UserCreated;
 use Common\Files\Actions\UploadFile;
 use Illuminate\Filesystem\Filesystem;
-use App\Services\Entries\CreateFolder;
 use Illuminate\Http\UploadedFile;
 
 class HydrateUserWithSampleDriveContents
@@ -48,13 +48,23 @@ class HydrateUserWithSampleDriveContents
         $this->hydrateFolder('documents', $user->id);
 
         $folder = $this->hydrateFolder('shared', $user->id);
-        app(AttachUsersToEntry::class)->execute(['tester@tester.com'], [$folder], ['view' => true]);
+        app(AttachUsersToEntry::class)->execute(
+            ['tester@tester.com'],
+            [$folder],
+            ['view' => true],
+        );
     }
 
     private function hydrateFolder($name, $userId, $parentId = null)
     {
         if ($name !== 'root') {
-            $folder = app()->make(CreateFolder::class)->execute(['name' => ucwords($name), 'userId' => $userId, 'parentId' => $parentId]);
+            $folder = app()
+                ->make(CreateFolder::class)
+                ->execute([
+                    'name' => ucwords($name),
+                    'ownerId' => $userId,
+                    'parentId' => $parentId,
+                ]);
         }
 
         $this->createFiles($name, isset($folder) ? $folder->id : null, $userId);
@@ -66,17 +76,22 @@ class HydrateUserWithSampleDriveContents
     {
         $folderPath = $this->samplesPath . $dirName;
 
-        if ( ! $this->fs->exists($folderPath)) return;
+        if (!$this->fs->exists($folderPath)) {
+            return;
+        }
 
         foreach ($this->fs->files($folderPath) as $path) {
             $uploadedFile = new UploadedFile(
                 $path,
                 basename($path),
                 $this->fs->mimeType($path),
-                $this->fs->size($path)
+                $this->fs->size($path),
             );
 
-            app(UploadFile::class)->execute('uploads', $uploadedFile, ['parentId' => $parentId, 'userId' => $userId]);
+            app(UploadFile::class)->execute('uploads', $uploadedFile, [
+                'parentId' => $parentId,
+                'userId' => $userId,
+            ]);
         }
     }
 }

@@ -1,8 +1,11 @@
 <?php namespace Common\Database;
 
 use Cache;
+use Carbon\Carbon;
 use Closure;
+use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -65,22 +68,11 @@ class Paginator
      */
     public $dontSort;
 
-    /**
-     * @var string|null
-     */
-    private $countCacheKey;
-
-    /**
-     * @param Model|Builder $model
-     * @param array $params
-     * @param string|null $countCacheKey
-     */
-    public function __construct($model, $params, $countCacheKey = null)
+    public function __construct($model, array $params)
     {
         $this->model = $model;
         $this->params = $this->toCamelCase($params);
         $this->query = $model->newQuery();
-        $this->countCacheKey = $countCacheKey;
     }
 
     /**
@@ -111,28 +103,38 @@ class Paginator
         $this->applyFilters();
 
         // order
-       if ( ! $this->dontSort) {
-           $this->query->orderBy($order['col'], $order['dir']);
-           if ($this->secondaryOrderCallback) {
-               call_user_func($this->secondaryOrderCallback, $this->query, $order['col'], $order['dir']);
-           }
-       }
+        if ( ! $this->dontSort) {
+            if ($this->isRawOrder($order['col'])) {
+                $this->query->orderByRaw($order['col']);
+            } else {
+                $this->query->orderBy($order['col'], $order['dir']);
+            }
 
-       $count = null;
-       if ($this->countCacheKey) {
-           $count = Cache::get($this->countCacheKey);
-       }
-       if (is_null($count)) {
-           $count = $this->query()->count();
-       }
+            if ($this->secondaryOrderCallback) {
+                call_user_func($this->secondaryOrderCallback, $this->query, $order['col'], $order['dir']);
+            }
+        }
 
-        // paginate
-        return new LengthAwarePaginator(
-            with(clone $this->query)->skip(($page - 1) * $perPage)->take($perPage)->get(),
-            $count,
-            $perPage,
-            $page
-        );
+        $countCacheKeyQuery = $this->query->toBase()->cloneWithout(['columns', 'orders', 'limit', 'offset']);
+        $countCacheKye = base64_encode(Str::replaceArray('?', $countCacheKeyQuery->getBindings(), $countCacheKeyQuery->toSql()));
+        $total = null;
+        if ($countCacheKye) {
+            $total = Cache::get($countCacheKye);
+        }
+        if (is_null($total)) {
+             $total = $this->query->toBase()->getCountForPagination();
+             if ($total > 500000) {
+                Cache::put($countCacheKye, $total, Carbon::now()->addDay());
+             }
+        }
+
+        $items = $total
+            ? $this->query->forPage($page, $perPage)->get()
+            : new Collection();
+
+        return Container::getInstance()->makeWith(LengthAwarePaginator::class, [
+            'items' => $items, 'total' => $total, 'perPage' => $perPage, 'page' => $page,
+        ]);
     }
 
     public function param(string $name, $default = null)
@@ -140,9 +142,10 @@ class Paginator
         return Arr::get($this->params, Str::camel($name)) ?: $default;
     }
 
-    public function setParam(string $name, $value)
+    public function setParam(string $name, $value): self
     {
         $this->params[$name] = $value;
+        return $this;
     }
 
     /**
@@ -189,14 +192,7 @@ class Paginator
         return $this;
     }
 
-    /**
-     * Set default order column and direction for paginator.
-     *
-     * @param $column
-     * @param string $direction
-     * @return $this
-     */
-    public function setDefaultOrderColumns($column, $direction = 'desc')
+    public function setDefaultOrderColumns($column, $direction = 'desc'): self
     {
         $this->defaultOrderColumn = $column;
         $this->defaultOrderDirection = $direction;
@@ -217,7 +213,10 @@ class Paginator
             $orderDir = $this->param('orderDir', $this->defaultOrderDirection);
         }
 
-        return ['dir' => Str::snake($orderDir), 'col' => Str::snake($orderCol)];
+        return [
+            'dir' => Str::snake($orderDir),
+            'col' => !$this->isRawOrder($orderCol) ? Str::snake($orderCol) : $orderCol,
+        ];
     }
 
     private function toCamelCase($params)
@@ -278,5 +277,10 @@ class Paginator
                 $this->query()->whereNull($column);
             }
         }
+    }
+
+    private function isRawOrder(string $order): bool
+    {
+        return Str::contains($order, ['(', ')']);
     }
 }

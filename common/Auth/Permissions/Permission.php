@@ -18,12 +18,24 @@ use Illuminate\Support\Collection;
  * @property Collection restrictions
  * @property string description
  * @mixin Eloquent
+ * @property string $display_name
+ * @property string|null $description
+ * @property string $group
+ * @property Collection $restrictions
+ * @property string $type
+ * @property int $advanced
+ * @method static \Illuminate\Database\Eloquent\Builder|Permission newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Permission newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Permission query()
  */
 class Permission extends Model
 {
     protected $guarded = ['id'];
 
-    protected $casts = ['id' => 'integer'];
+    protected $casts = [
+        'id' => 'integer',
+        'advanced' => 'integer',
+    ];
 
     protected $hidden = ['pivot', 'permissionable_type'];
 

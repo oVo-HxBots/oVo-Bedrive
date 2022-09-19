@@ -3,14 +3,14 @@
 return [
     [
         'property' => 'og:url',
-        'content' =>  '{{URL.PAGE}}',
+        'content' =>  '{{url.page}}',
     ],
     [
         'property' => 'og:title',
-        'content' => '{{PAGE.TITLE}} - {{SITE_NAME}}',
+        'content' => '{{page.title}} - {{site_name}}',
     ],
     [
         'property' => 'og:description',
-        'content' => '{{PAGE.BODY}}',
+        'content' => '{{page.body}}',
     ],
 ];

@@ -26,7 +26,7 @@ class CrupdateCommentRequest extends BaseFormRequest
         $userId = $this->route('comment') ? $this->route('comment')->user_id : Auth::id();
 
         return [
-            'content' => 'required|string|max:190|min:4'
+            'content' => 'required|string|max:1000|min:4'
         ];
     }
 }

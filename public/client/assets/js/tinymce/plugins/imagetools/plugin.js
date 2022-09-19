@@ -4,7 +4,7 @@
  * For LGPL see License.txt in the project root for license information.
  * For commercial licenses see https://www.tiny.cloud/
  *
- * Version: 5.5.1 (2020-10-01)
+ * Version: 5.8.2 (2021-06-23)
  */
 (function () {
     'use strict';
@@ -26,6 +26,19 @@
     var global = tinymce.util.Tools.resolve('tinymce.PluginManager');
 
     var global$1 = tinymce.util.Tools.resolve('tinymce.util.Tools');
+
+    var isSimpleType = function (type) {
+      return function (value) {
+        return typeof value === type;
+      };
+    };
+    var isNullable = function (a) {
+      return a === null || a === undefined;
+    };
+    var isNonNullable = function (a) {
+      return !isNullable(a);
+    };
+    var isFunction = isSimpleType('function');
 
     var noop = function () {
     };
@@ -143,43 +156,30 @@
       from: from
     };
 
-    var isSimpleType = function (type) {
-      return function (value) {
-        return typeof value === type;
-      };
-    };
-    var isNullable = function (a) {
-      return a === null || a === undefined;
-    };
-    var isNonNullable = function (a) {
-      return !isNullable(a);
-    };
-    var isFunction = isSimpleType('function');
-
-    function create(width, height) {
+    var create = function (width, height) {
       return resize(document.createElement('canvas'), width, height);
-    }
-    function clone(canvas) {
+    };
+    var clone = function (canvas) {
       var tCanvas = create(canvas.width, canvas.height);
       var ctx = get2dContext(tCanvas);
       ctx.drawImage(canvas, 0, 0);
       return tCanvas;
-    }
-    function get2dContext(canvas) {
+    };
+    var get2dContext = function (canvas) {
       return canvas.getContext('2d');
-    }
-    function resize(canvas, width, height) {
+    };
+    var resize = function (canvas, width, height) {
       canvas.width = width;
       canvas.height = height;
       return canvas;
-    }
+    };
 
-    function getWidth(image) {
+    var getWidth = function (image) {
       return image.naturalWidth || image.width;
-    }
-    function getHeight(image) {
+    };
+    var getHeight = function (image) {
       return image.naturalHeight || image.height;
-    }
+    };
 
     var promise = function () {
       var Promise = function (fn) {
@@ -196,13 +196,17 @@
       };
       var anyWindow = window;
       var asap = Promise.immediateFn || typeof anyWindow.setImmediate === 'function' && anyWindow.setImmediate || function (fn) {
-        setTimeout(fn, 1);
+        return setTimeout(fn, 1);
       };
-      function bind(fn, thisArg) {
+      var bind = function (fn, thisArg) {
         return function () {
-          return fn.apply(thisArg, arguments);
+          var args = [];
+          for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
+          }
+          return fn.apply(thisArg, args);
         };
-      }
+      };
       var isArray = Array.isArray || function (value) {
         return Object.prototype.toString.call(value) === '[object Array]';
       };
@@ -265,7 +269,7 @@
         this.resolve = resolve;
         this.reject = reject;
       }
-      function doResolve(fn, onFulfilled, onRejected) {
+      var doResolve = function (fn, onFulfilled, onRejected) {
         var done = false;
         try {
           fn(function (value) {
@@ -288,7 +292,7 @@
           done = true;
           onRejected(ex);
         }
-      }
+      };
       Promise.prototype.catch = function (onRejected) {
         return this.then(null, onRejected);
       };
@@ -309,7 +313,7 @@
             return resolve([]);
           }
           var remaining = args.length;
-          function res(i, val) {
+          var res = function (i, val) {
             try {
               if (val && (typeof val === 'object' || typeof val === 'function')) {
                 var then = val.then;
@@ -327,7 +331,7 @@
             } catch (ex) {
               reject(ex);
             }
-          }
+          };
           for (var i = 0; i < args.length; i++) {
             res(i, args[i]);
           }
@@ -358,14 +362,14 @@
     };
     var Promise = window.Promise ? window.Promise : promise();
 
-    function imageToBlob(image) {
+    var imageToBlob = function (image) {
       var src = image.src;
       if (src.indexOf('data:') === 0) {
         return dataUriToBlob(src);
       }
       return anyUriToBlob(src);
-    }
-    function blobToImage(blob) {
+    };
+    var blobToImage = function (blob) {
       return new Promise(function (resolve, reject) {
         var blobUrl = URL.createObjectURL(blob);
         var image = new Image();
@@ -373,23 +377,23 @@
           image.removeEventListener('load', loaded);
           image.removeEventListener('error', error);
         };
-        function loaded() {
+        var loaded = function () {
           removeListeners();
           resolve(image);
-        }
-        function error() {
+        };
+        var error = function () {
           removeListeners();
           reject('Unable to load data of type ' + blob.type + ': ' + blobUrl);
-        }
+        };
         image.addEventListener('load', loaded);
         image.addEventListener('error', error);
         image.src = blobUrl;
         if (image.complete) {
-          loaded();
+          setTimeout(loaded, 0);
         }
       });
-    }
-    function anyUriToBlob(url) {
+    };
+    var anyUriToBlob = function (url) {
       return new Promise(function (resolve, reject) {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url, true);
@@ -414,8 +418,8 @@
         };
         xhr.send();
       });
-    }
-    function dataUriToBlobSync(uri) {
+    };
+    var dataUriToBlobSync = function (uri) {
       var data = uri.split(',');
       var matches = /data:([^;]+)/.exec(data[0]);
       if (!matches) {
@@ -438,15 +442,15 @@
         byteArrays[sliceIndex] = new Uint8Array(bytes);
       }
       return Optional.some(new Blob(byteArrays, { type: mimetype }));
-    }
-    function dataUriToBlob(uri) {
+    };
+    var dataUriToBlob = function (uri) {
       return new Promise(function (resolve, reject) {
         dataUriToBlobSync(uri).fold(function () {
           reject('uri is not base64: ' + uri);
         }, resolve);
       });
-    }
-    function canvasToBlob(canvas, type, quality) {
+    };
+    var canvasToBlob = function (canvas, type, quality) {
       type = type || 'image/png';
       if (isFunction(HTMLCanvasElement.prototype.toBlob)) {
         return new Promise(function (resolve, reject) {
@@ -461,12 +465,12 @@
       } else {
         return dataUriToBlob(canvas.toDataURL(type, quality));
       }
-    }
-    function canvasToDataURL(canvas, type, quality) {
+    };
+    var canvasToDataURL = function (canvas, type, quality) {
       type = type || 'image/png';
       return canvas.toDataURL(type, quality);
-    }
-    function blobToCanvas(blob) {
+    };
+    var blobToCanvas = function (blob) {
       return blobToImage(blob).then(function (image) {
         revokeImageUrl(image);
         var canvas = create(getWidth(image), getHeight(image));
@@ -474,8 +478,8 @@
         context.drawImage(image, 0, 0);
         return canvas;
       });
-    }
-    function blobToDataUri(blob) {
+    };
+    var blobToDataUri = function (blob) {
       return new Promise(function (resolve) {
         var reader = new FileReader();
         reader.onloadend = function () {
@@ -483,10 +487,10 @@
         };
         reader.readAsDataURL(blob);
       });
-    }
-    function revokeImageUrl(image) {
+    };
+    var revokeImageUrl = function (image) {
       URL.revokeObjectURL(image.src);
-    }
+    };
 
     var blobToImage$1 = function (blob) {
       return blobToImage(blob);
@@ -522,34 +526,34 @@
       return findUntil(xs, pred, never);
     };
 
-    function create$1(getCanvas, blob, uri) {
+    var create$1 = function (getCanvas, blob, uri) {
       var initialType = blob.type;
       var getType = constant(initialType);
-      function toBlob() {
+      var toBlob = function () {
         return Promise.resolve(blob);
-      }
+      };
       var toDataURL = constant(uri);
-      function toBase64() {
+      var toBase64 = function () {
         return uri.split(',')[1];
-      }
-      function toAdjustedBlob(type, quality) {
+      };
+      var toAdjustedBlob = function (type, quality) {
         return getCanvas.then(function (canvas) {
           return canvasToBlob(canvas, type, quality);
         });
-      }
-      function toAdjustedDataURL(type, quality) {
+      };
+      var toAdjustedDataURL = function (type, quality) {
         return getCanvas.then(function (canvas) {
           return canvasToDataURL(canvas, type, quality);
         });
-      }
-      function toAdjustedBase64(type, quality) {
+      };
+      var toAdjustedBase64 = function (type, quality) {
         return toAdjustedDataURL(type, quality).then(function (dataurl) {
           return dataurl.split(',')[1];
         });
-      }
-      function toCanvas() {
+      };
+      var toCanvas = function () {
         return getCanvas.then(clone);
-      }
+      };
       return {
         getType: getType,
         toBlob: toBlob,
@@ -560,49 +564,53 @@
         toAdjustedBase64: toAdjustedBase64,
         toCanvas: toCanvas
       };
-    }
-    function fromBlob(blob) {
+    };
+    var fromBlob = function (blob) {
       return blobToDataUri(blob).then(function (uri) {
         return create$1(blobToCanvas(blob), blob, uri);
       });
-    }
-    function fromCanvas(canvas, type) {
+    };
+    var fromCanvas = function (canvas, type) {
       return canvasToBlob(canvas, type).then(function (blob) {
         return create$1(Promise.resolve(canvas), blob, canvas.toDataURL());
       });
-    }
+    };
 
-    function rotate(ir, angle) {
+    var ceilWithPrecision = function (num, precision) {
+      if (precision === void 0) {
+        precision = 2;
+      }
+      var mul = Math.pow(10, precision);
+      var upper = Math.round(num * mul);
+      return Math.ceil(upper / mul);
+    };
+    var rotate = function (ir, angle) {
       return ir.toCanvas().then(function (canvas) {
         return applyRotate(canvas, ir.getType(), angle);
       });
-    }
-    function applyRotate(image, type, angle) {
-      var canvas = create(image.width, image.height);
+    };
+    var applyRotate = function (image, type, angle) {
+      var degrees = angle < 0 ? 360 + angle : angle;
+      var rad = degrees * Math.PI / 180;
+      var width = image.width;
+      var height = image.height;
+      var sin = Math.sin(rad);
+      var cos = Math.cos(rad);
+      var newWidth = ceilWithPrecision(Math.abs(width * cos) + Math.abs(height * sin));
+      var newHeight = ceilWithPrecision(Math.abs(width * sin) + Math.abs(height * cos));
+      var canvas = create(newWidth, newHeight);
       var context = get2dContext(canvas);
-      var translateX = 0;
-      var translateY = 0;
-      angle = angle < 0 ? 360 + angle : angle;
-      if (angle === 90 || angle === 270) {
-        resize(canvas, canvas.height, canvas.width);
-      }
-      if (angle === 90 || angle === 180) {
-        translateX = canvas.width;
-      }
-      if (angle === 270 || angle === 180) {
-        translateY = canvas.height;
-      }
-      context.translate(translateX, translateY);
-      context.rotate(angle * Math.PI / 180);
-      context.drawImage(image, 0, 0);
+      context.translate(newWidth / 2, newHeight / 2);
+      context.rotate(rad);
+      context.drawImage(image, -width / 2, -height / 2);
       return fromCanvas(canvas, type);
-    }
-    function flip(ir, axis) {
+    };
+    var flip = function (ir, axis) {
       return ir.toCanvas().then(function (canvas) {
         return applyFlip(canvas, ir.getType(), axis);
       });
-    }
-    function applyFlip(image, type, axis) {
+    };
+    var applyFlip = function (image, type, axis) {
       var canvas = create(image.width, image.height);
       var context = get2dContext(canvas);
       if (axis === 'v') {
@@ -613,7 +621,7 @@
         context.drawImage(image, -canvas.width, 0);
       }
       return fromCanvas(canvas, type);
-    }
+    };
 
     var flip$1 = function (ir, axis) {
       return flip(ir, axis);
@@ -897,11 +905,11 @@
       return editor.getParam('images_reuse_filename', false, 'boolean');
     };
 
-    function getImageSize(img) {
+    var getImageSize = function (img) {
       var width, height;
-      function isPxValue(value) {
+      var isPxValue = function (value) {
         return /^[0-9\.]+px$/.test(value);
-      }
+      };
       width = img.style.width;
       height = img.style.height;
       if (width || height) {
@@ -922,8 +930,8 @@
         };
       }
       return null;
-    }
-    function setImageSize(img, size) {
+    };
+    var setImageSize = function (img, size) {
       var width, height;
       if (size) {
         width = img.style.width;
@@ -936,17 +944,17 @@
         width = img.width;
         height = img.height;
         if (width || height) {
-          img.setAttribute('width', size.w);
-          img.setAttribute('height', size.h);
+          img.setAttribute('width', String(size.w));
+          img.setAttribute('height', String(size.h));
         }
       }
-    }
-    function getNaturalImageSize(img) {
+    };
+    var getNaturalImageSize = function (img) {
       return {
         w: img.naturalWidth,
         h: img.naturalHeight
       };
-    }
+    };
 
     var count = 0;
     var getFigureImg = function (elem) {
@@ -955,20 +963,20 @@
     var isFigure = function (editor, elem) {
       return editor.dom.is(elem, 'figure');
     };
-    var getEditableImage = function (editor, elem) {
-      var isImage = function (imgNode) {
-        return editor.dom.is(imgNode, 'img:not([data-mce-object],[data-mce-placeholder])');
-      };
+    var isImage = function (editor, imgNode) {
+      return editor.dom.is(imgNode, 'img:not([data-mce-object],[data-mce-placeholder])');
+    };
+    var getEditableImage = function (editor, node) {
       var isEditable = function (imgNode) {
-        return isImage(imgNode) && (isLocalImage(editor, imgNode) || isCorsImage(editor, imgNode) || getProxyUrl(editor));
+        return isImage(editor, imgNode) && (isLocalImage(editor, imgNode) || isCorsImage(editor, imgNode) || isNonNullable(getProxyUrl(editor)));
       };
-      if (isFigure(editor, elem)) {
-        var imgOpt = getFigureImg(elem);
-        return imgOpt.map(function (img) {
+      if (isFigure(editor, node)) {
+        return getFigureImg(node).bind(function (img) {
           return isEditable(img.dom) ? Optional.some(img.dom) : Optional.none();
         });
+      } else {
+        return isEditable(node) ? Optional.some(node) : Optional.none();
       }
-      return isEditable(elem) ? Optional.some(elem) : Optional.none();
     };
     var displayError = function (editor, error) {
       editor.notificationManager.open({
@@ -978,18 +986,18 @@
     };
     var getSelectedImage = function (editor) {
       var elem = editor.selection.getNode();
-      if (isFigure(editor, elem)) {
-        return getFigureImg(elem);
-      } else {
+      var figureElm = editor.dom.getParent(elem, 'figure.image');
+      if (figureElm !== null && isFigure(editor, figureElm)) {
+        return getFigureImg(figureElm);
+      } else if (isImage(editor, elem)) {
         return Optional.some(SugarElement.fromDom(elem));
+      } else {
+        return Optional.none();
       }
     };
-    var extractFilename = function (editor, url) {
-      var m = url.match(/\/([^\/\?]+)?\.(?:jpeg|jpg|png|gif)(?:\?|$)/i);
-      if (m) {
-        return editor.dom.encode(m[1]);
-      }
-      return null;
+    var extractFilename = function (editor, url, group) {
+      var m = url.match(/(?:\/|^)(([^\/\?]+)\.(?:[a-z0-9.]+))(?:\?|$)/i);
+      return isNonNullable(m) ? editor.dom.encode(m[group]) : null;
     };
     var createId = function () {
       return 'imagetools' + count++;
@@ -1039,18 +1047,21 @@
     var cancelTimedUpload = function (imageUploadTimerState) {
       global$2.clearTimeout(imageUploadTimerState.get());
     };
-    var updateSelectedImage = function (editor, ir, uploadImmediately, imageUploadTimerState, selectedImage, size) {
+    var updateSelectedImage = function (editor, origBlob, ir, uploadImmediately, imageUploadTimerState, selectedImage, size) {
       return ir.toBlob().then(function (blob) {
-        var uri, name, blobInfo;
+        var uri, name, filename, blobInfo;
         var blobCache = editor.editorUpload.blobCache;
         uri = selectedImage.src;
+        var useFilename = origBlob.type === blob.type;
         if (shouldReuseFilename(editor)) {
           blobInfo = blobCache.getByUri(uri);
-          if (blobInfo) {
+          if (isNonNullable(blobInfo)) {
             uri = blobInfo.uri();
             name = blobInfo.name();
+            filename = blobInfo.filename();
           } else {
-            name = extractFilename(editor, uri);
+            name = extractFilename(editor, uri, 2);
+            filename = extractFilename(editor, uri, 1);
           }
         }
         blobInfo = blobCache.create({
@@ -1058,11 +1069,12 @@
           blob: blob,
           base64: ir.toBase64(),
           uri: uri,
-          name: name
+          name: name,
+          filename: useFilename ? filename : undefined
         });
         blobCache.add(blobInfo);
         editor.undoManager.transact(function () {
-          function imageLoadedHandler() {
+          var imageLoadedHandler = function () {
             editor.$(selectedImage).off('load', imageLoadedHandler);
             editor.nodeChanged();
             if (uploadImmediately) {
@@ -1071,7 +1083,7 @@
               cancelTimedUpload(imageUploadTimerState);
               startTimedUpload(editor, imageUploadTimerState);
             }
-          }
+          };
           editor.$(selectedImage).on('load', imageLoadedHandler);
           if (size) {
             editor.$(selectedImage).attr({
@@ -1092,9 +1104,11 @@
         }, function (img) {
           return editor._scanForImages().then(function () {
             return findBlob(editor, img.dom);
-          }).then(blobToImageResult).then(fn).then(function (imageResult) {
-            return updateSelectedImage(editor, imageResult, false, imageUploadTimerState, img.dom, size);
-          }, function (error) {
+          }).then(function (blob) {
+            return blobToImageResult(blob).then(fn).then(function (imageResult) {
+              return updateSelectedImage(editor, blob, imageResult, false, imageUploadTimerState, img.dom, size);
+            });
+          }).catch(function (error) {
             displayError(editor, error);
           });
         });
@@ -1135,8 +1149,7 @@
         URL.revokeObjectURL(newImage.src);
         return blob;
       }).then(blobToImageResult).then(function (imageResult) {
-        return updateSelectedImage(editor, imageResult, true, imageUploadTimerState, img);
-      }, function () {
+        return updateSelectedImage(editor, blob, imageResult, true, imageUploadTimerState, img);
       });
     };
 
@@ -1188,8 +1201,7 @@
               });
               api.close();
             },
-            onCancel: function () {
-            },
+            onCancel: noop,
             onAction: function (api, details) {
               switch (details.name) {
               case saveState:
@@ -1214,8 +1226,7 @@
         var originalSizeOpt = originalImgOpt.map(function (origImg) {
           return getNaturalImageSize(origImg.dom);
         });
-        var imgOpt = getSelectedImage(editor);
-        imgOpt.each(function (img) {
+        originalImgOpt.each(function (img) {
           getEditableImage(editor, img.dom).each(function (_) {
             findBlob(editor, img.dom).then(function (blob) {
               var state = createState(blob);
@@ -1241,12 +1252,15 @@
     var setup = function (editor, imageUploadTimerState, lastSelectedImageState) {
       editor.on('NodeChange', function (e) {
         var lastSelectedImage = lastSelectedImageState.get();
-        if (lastSelectedImage && lastSelectedImage.src !== e.element.src) {
+        var selectedImage = getEditableImage(editor, e.element);
+        if (lastSelectedImage && !selectedImage.exists(function (img) {
+            return lastSelectedImage.src === img.src;
+          })) {
           cancelTimedUpload(imageUploadTimerState);
           editor.editorUpload.uploadImagesAuto();
           lastSelectedImageState.set(null);
         }
-        getEditableImage(editor, e.element).each(lastSelectedImageState.set);
+        selectedImage.each(lastSelectedImageState.set);
       });
     };
 
@@ -1282,11 +1296,10 @@
         onAction: cmd('mceEditImage'),
         onSetup: function (buttonApi) {
           var setDisabled = function () {
-            var elementOpt = getSelectedImage(editor);
-            elementOpt.each(function (element) {
-              var disabled = getEditableImage(editor, element.dom).isNone();
-              buttonApi.setDisabled(disabled);
+            var disabled = getSelectedImage(editor).forall(function (element) {
+              return getEditableImage(editor, element.dom).isNone();
             });
+            buttonApi.setDisabled(disabled);
           };
           editor.on('NodeChange', setDisabled);
           return function () {

@@ -23,6 +23,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $email
  * @property User user
  * @mixin Eloquent
+ * @property string|null $avatar
+ * @property-read string $display_name
+ * @property-read string $model_type
+ * @property-read User|null $user
+ * @property-read \Common\Workspaces\Workspace $workspace
+ * @method static \Illuminate\Database\Eloquent\Builder|WorkspaceInvite newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|WorkspaceInvite newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|WorkspaceInvite query()
  */
 class WorkspaceInvite extends Model
 {
@@ -48,7 +56,8 @@ class WorkspaceInvite extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function getModelTypeAttribute() {
+    public static function getModelTypeAttribute(): string
+    {
         return 'invite';
     }
 }

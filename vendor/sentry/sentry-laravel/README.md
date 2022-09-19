@@ -21,14 +21,16 @@ Laravel integration for [Sentry](https://sentry.io/).
 - Laravel `>= 5.x.x` on PHP `>= 7.1` is supported in all versions
 - Laravel `>= 6.x.x` on PHP `>= 7.2` is supported starting from `1.2.0`
 - Laravel `>= 7.x.x` on PHP `>= 7.2` is supported starting from `1.7.0`
+- Laravel `>= 8.x.x` on PHP `>= 7.3` is supported starting from `1.9.0`
 
-Please note that of version `>= 1.0.0` we require PHP Version `>= 7.1` because we are using our new [PHP SDK](https://github.com/getsentry/sentry-php) underneath. 
+Please note that of version `>= 2.0.0` we require PHP Version `>= 7.2` because we are using our new [PHP SDK](https://github.com/getsentry/sentry-php) underneath. 
 
 ## Installation
 
-- [Laravel 5.x & 6.x & 7.x](https://docs.sentry.io/platforms/php/laravel/#laravel-5x--6x)
-- [Lumen 5.x & 6.x](https://docs.sentry.io/platforms/php/laravel/#lumen-5x--6x)
-- [Laravel 4.x](https://docs.sentry.io/platforms/php/laravel/#laravel-4x)
+- [Laravel 7.x & 8.x](https://docs.sentry.io/platforms/php/guides/laravel/)
+- [Laravel 5.x & 6.x](https://docs.sentry.io/platforms/php/guides/laravel/configuration/other-versions/laravel5-6/)
+- [Laravel 4.x](https://docs.sentry.io/platforms/php/guides/laravel/configuration/other-versions/laravel4/)
+- [Lumen](https://docs.sentry.io/platforms/php/guides/laravel/configuration/other-versions/lumen/)
 
 ## Contributing
 
@@ -46,6 +48,6 @@ $ vendor/bin/phpunit
 
 ## Links
 
-* [Documentation](http://docs.sentry.io/platforms/php/laravel/)
+* [Documentation](https://docs.sentry.io/platforms/php/guides/laravel/)
 * [Bug Tracker](http://github.com/getsentry/sentry-laravel/issues)
 * [Code](http://github.com/getsentry/sentry-laravel)

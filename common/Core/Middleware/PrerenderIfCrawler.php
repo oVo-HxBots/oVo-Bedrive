@@ -40,15 +40,7 @@ class PrerenderIfCrawler
         'developers.google.com/+/web/snippet',
     ];
 
-    /**
-     * Prerender request if it's requested by a crawler.
-     *
-     * @param Request $request
-     * @param Closure $next
-     * @param string $routeName
-     * @return Request|View
-     */
-    public function handle(Request $request, Closure $next, $routeName = null)
+    public function handle(Request $request, Closure $next, string $routeName = null)
     {
         if ($this->shouldPrerender($request)) {
             define('SHOULD_PRERENDER', true);
@@ -62,13 +54,7 @@ class PrerenderIfCrawler
         return $next($request);
     }
 
-    /**
-     * Check if request should be prerendered.
-     *
-     * @param Request $request
-     * @return bool
-     */
-    protected function shouldPrerender(Request $request)
+    protected function shouldPrerender(Request $request): bool
     {
         $userAgent = strtolower($request->server->get('HTTP_USER_AGENT'));
         $bufferAgent = $request->server->get('X-BUFFERBOT');

@@ -3,7 +3,6 @@
 namespace Common\Files\Chunks;
 
 use Auth;
-use Request;
 
 trait HandlesUploadChunks
 {
@@ -16,8 +15,7 @@ trait HandlesUploadChunks
     protected function getFingerprint($clientFingerprint)
     {
         $userId = Auth::id();
-        $ip = Request::ip();
-        return md5($clientFingerprint . "$ip|$userId");
+        return md5($clientFingerprint . "$userId");
     }
 
     protected function chunksRootDir()

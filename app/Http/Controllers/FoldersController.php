@@ -7,6 +7,7 @@ use App\Folder;
 use App\Services\Entries\CreateFolder;
 use App\Services\Entries\FolderExistsException;
 use App\Services\Entries\SetPermissionsOnEntry;
+use Auth;
 use Common\Core\BaseController;
 use Common\Files\Events\FileEntryCreated;
 use Illuminate\Http\JsonResponse;
@@ -50,11 +51,6 @@ class FoldersController extends BaseController
         return $this->success(['folder' => $folder]);
     }
 
-    /**
-     * Create a new folder.
-     *
-     * @return JsonResponse
-     */
     public function store()
     {
         $name = $this->request->get('name');
@@ -71,7 +67,7 @@ class FoldersController extends BaseController
             $folder = app(CreateFolder::class)->execute([
                 'name' => $name,
                 'parentId' => $parentId,
-                'userId' => $this->request->user()->id
+                'ownerId' => Auth::id()
             ]);
         } catch (FolderExistsException $e) {
             return $this->error('', ['name' => __('Folder with same name already exists.')]);

@@ -6,6 +6,7 @@ use Closure;
 use DateTimeInterface;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Database\Concerns\BuildsQueries;
+use Illuminate\Database\Concerns\ExplainsQueries;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -23,7 +24,7 @@ use RuntimeException;
 
 class Builder
 {
-    use BuildsQueries, ForwardsCalls, Macroable {
+    use BuildsQueries, ExplainsQueries, ForwardsCalls, Macroable {
         __call as macroCall;
     }
 
@@ -180,9 +181,16 @@ class Builder
     public $lock;
 
     /**
-     * All of the available clause operators.
+     * The callbacks that should be invoked before the query is executed.
      *
      * @var array
+     */
+    public $beforeQueryCallbacks = [];
+
+    /**
+     * All of the available clause operators.
+     *
+     * @var string[]
      */
     public $operators = [
         '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
@@ -194,7 +202,7 @@ class Builder
     ];
 
     /**
-     * Whether use write pdo for select.
+     * Whether to use write pdo for the select.
      *
      * @var bool
      */
@@ -243,7 +251,7 @@ class Builder
     /**
      * Add a subselect expression to the query.
      *
-     * @param  \Closure|$this|string  $query
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string  $query
      * @param  string  $as
      * @return $this
      *
@@ -339,6 +347,8 @@ class Builder
     protected function parseSub($query)
     {
         if ($query instanceof self || $query instanceof EloquentBuilder || $query instanceof Relation) {
+            $query = $this->prependDatabaseNameIfCrossDatabaseQuery($query);
+
             return [$query->toSql(), $query->getBindings()];
         } elseif (is_string($query)) {
             return [$query, []];
@@ -347,6 +357,26 @@ class Builder
                 'A subquery must be a query builder instance, a Closure, or a string.'
             );
         }
+    }
+
+    /**
+     * Prepend the database name if the given query is on another database.
+     *
+     * @param  mixed  $query
+     * @return mixed
+     */
+    protected function prependDatabaseNameIfCrossDatabaseQuery($query)
+    {
+        if ($query->getConnection()->getDatabaseName() !==
+            $this->getConnection()->getDatabaseName()) {
+            $databaseName = $query->getConnection()->getDatabaseName();
+
+            if (strpos($query->from, $databaseName) !== 0 && strpos($query->from, '.') === false) {
+                $query->from($databaseName.'.'.$query->from);
+            }
+        }
+
+        return $query;
     }
 
     /**
@@ -377,6 +407,7 @@ class Builder
     /**
      * Force the query to only return distinct results.
      *
+     * @param  mixed  ...$distinct
      * @return $this
      */
     public function distinct()
@@ -468,7 +499,7 @@ class Builder
     /**
      * Add a subquery join clause to the query.
      *
-     * @param  \Closure|\Illuminate\Database\Query\Builder|string  $query
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string  $query
      * @param  string  $as
      * @param  \Closure|string  $first
      * @param  string|null  $operator
@@ -521,7 +552,7 @@ class Builder
     /**
      * Add a subquery left join to the query.
      *
-     * @param  \Closure|\Illuminate\Database\Query\Builder|string  $query
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string  $query
      * @param  string  $as
      * @param  \Closure|string  $first
      * @param  string|null  $operator
@@ -564,7 +595,7 @@ class Builder
     /**
      * Add a subquery right join to the query.
      *
-     * @param  \Closure|\Illuminate\Database\Query\Builder|string  $query
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder|string  $query
      * @param  string  $as
      * @param  \Closure|string  $first
      * @param  string|null  $operator
@@ -592,6 +623,26 @@ class Builder
         }
 
         $this->joins[] = $this->newJoinClause($this, 'cross', $table);
+
+        return $this;
+    }
+
+    /**
+     * Add a subquery cross join to the query.
+     *
+     * @param  \Closure|\Illuminate\Database\Query\Builder|string  $query
+     * @param  string  $as
+     * @return $this
+     */
+    public function crossJoinSub($query, $as)
+    {
+        [$query, $bindings] = $this->createSub($query);
+
+        $expression = '('.$query.') as '.$this->grammar->wrapTable($as);
+
+        $this->addBinding($bindings, 'join');
+
+        $this->joins[] = $this->newJoinClause($this, 'cross', new Expression($expression));
 
         return $this;
     }
@@ -1043,7 +1094,7 @@ class Builder
     /**
      * Add an "or where null" clause to the query.
      *
-     * @param  string  $column
+     * @param  string|array  $column
      * @return $this
      */
     public function orWhereNull($column)
@@ -1066,7 +1117,7 @@ class Builder
     /**
      * Add a where between statement to the query.
      *
-     * @param  string  $column
+     * @param  string|\Illuminate\Database\Query\Expression  $column
      * @param  array  $values
      * @param  string  $boolean
      * @param  bool  $not
@@ -1942,7 +1993,7 @@ class Builder
     /**
      * Add a descending "order by" clause to the query.
      *
-     * @param  string  $column
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Query\Expression|string  $column
      * @return $this
      */
     public function orderByDesc($column)
@@ -1953,7 +2004,7 @@ class Builder
     /**
      * Add an "order by" clause for a timestamp to the query.
      *
-     * @param  string  $column
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Query\Expression|string  $column
      * @return $this
      */
     public function latest($column = 'created_at')
@@ -1964,7 +2015,7 @@ class Builder
     /**
      * Add an "order by" clause for a timestamp to the query.
      *
-     * @param  string  $column
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Query\Expression|string  $column
      * @return $this
      */
     public function oldest($column = 'created_at')
@@ -2022,7 +2073,7 @@ class Builder
     {
         $property = $this->unions ? 'unionOffset' : 'offset';
 
-        $this->$property = max(0, $value);
+        $this->$property = max(0, (int) $value);
 
         return $this;
     }
@@ -2110,7 +2161,7 @@ class Builder
     /**
      * Remove all existing orders and optionally add a new order.
      *
-     * @param  string|null  $column
+     * @param  \Closure|\Illuminate\Database\Query\Builder|\Illuminate\Database\Query\Expression|string|null  $column
      * @param  string  $direction
      * @return $this
      */
@@ -2212,12 +2263,41 @@ class Builder
     }
 
     /**
+     * Register a closure to be invoked before the query is executed.
+     *
+     * @param  callable  $callback
+     * @return $this
+     */
+    public function beforeQuery(callable $callback)
+    {
+        $this->beforeQueryCallbacks[] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * Invoke the "before query" modification callbacks.
+     *
+     * @return void
+     */
+    public function applyBeforeQueryCallbacks()
+    {
+        foreach ($this->beforeQueryCallbacks as $callback) {
+            $callback($this);
+        }
+
+        $this->beforeQueryCallbacks = [];
+    }
+
+    /**
      * Get the SQL representation of the query.
      *
      * @return string
      */
     public function toSql()
     {
+        $this->applyBeforeQueryCallbacks();
+
         return $this->grammar->compileSelect($this);
     }
 
@@ -2315,6 +2395,43 @@ class Builder
             'path' => Paginator::resolveCurrentPath(),
             'pageName' => $pageName,
         ]);
+    }
+
+    /**
+     * Get a paginator only supporting simple next and previous links.
+     *
+     * This is more efficient on larger data-sets, etc.
+     *
+     * @param  int|null  $perPage
+     * @param  array  $columns
+     * @param  string  $cursorName
+     * @param  \Illuminate\Pagination\Cursor|string|null  $cursor
+     * @return \Illuminate\Contracts\Pagination\CursorPaginator
+     */
+    public function cursorPaginate($perPage = 15, $columns = ['*'], $cursorName = 'cursor', $cursor = null)
+    {
+        return $this->paginateUsingCursor($perPage, $columns, $cursorName, $cursor);
+    }
+
+    /**
+     * Ensure the proper order by required for cursor pagination.
+     *
+     * @param  bool  $shouldReverse
+     * @return \Illuminate\Support\Collection
+     */
+    protected function ensureOrderForCursorPagination($shouldReverse = false)
+    {
+        $this->enforceOrderBy();
+
+        if ($shouldReverse) {
+            $this->orders = collect($this->orders)->map(function ($order) {
+                $order['direction'] = $order['direction'] === 'asc' ? 'desc' : 'asc';
+
+                return $order;
+            })->toArray();
+        }
+
+        return collect($this->orders);
     }
 
     /**
@@ -2427,7 +2544,7 @@ class Builder
     }
 
     /**
-     * Get an array with the values of a given column.
+     * Get a collection instance containing the values of a given column.
      *
      * @param  string  $column
      * @param  string|null  $key
@@ -2549,6 +2666,8 @@ class Builder
      */
     public function exists()
     {
+        $this->applyBeforeQueryCallbacks();
+
         $results = $this->connection->select(
             $this->grammar->compileExists($this), $this->getBindings(), ! $this->useWritePdo
         );
@@ -2674,8 +2793,8 @@ class Builder
      */
     public function aggregate($function, $columns = ['*'])
     {
-        $results = $this->cloneWithout($this->unions ? [] : ['columns'])
-                        ->cloneWithoutBindings($this->unions ? [] : ['select'])
+        $results = $this->cloneWithout($this->unions || $this->havings ? [] : ['columns'])
+                        ->cloneWithoutBindings($this->unions || $this->havings ? [] : ['select'])
                         ->setAggregate($function, $columns)
                         ->get($columns);
 
@@ -2758,7 +2877,7 @@ class Builder
     }
 
     /**
-     * Insert a new record into the database.
+     * Insert new records into the database.
      *
      * @param  array  $values
      * @return bool
@@ -2787,6 +2906,8 @@ class Builder
             }
         }
 
+        $this->applyBeforeQueryCallbacks();
+
         // Finally, we will run this query against the database connection and return
         // the results. We will need to also flatten these bindings before running
         // the query so they are all in one huge, flattened array for execution.
@@ -2797,7 +2918,7 @@ class Builder
     }
 
     /**
-     * Insert a new record into the database while ignoring errors.
+     * Insert new records into the database while ignoring errors.
      *
      * @param  array  $values
      * @return int
@@ -2817,6 +2938,8 @@ class Builder
             }
         }
 
+        $this->applyBeforeQueryCallbacks();
+
         return $this->connection->affectingStatement(
             $this->grammar->compileInsertOrIgnore($this, $values),
             $this->cleanBindings(Arr::flatten($values, 1))
@@ -2832,6 +2955,8 @@ class Builder
      */
     public function insertGetId(array $values, $sequence = null)
     {
+        $this->applyBeforeQueryCallbacks();
+
         $sql = $this->grammar->compileInsertGetId($this, $values, $sequence);
 
         $values = $this->cleanBindings($values);
@@ -2848,6 +2973,8 @@ class Builder
      */
     public function insertUsing(array $columns, $query)
     {
+        $this->applyBeforeQueryCallbacks();
+
         [$sql, $bindings] = $this->createSub($query);
 
         return $this->connection->affectingStatement(
@@ -2857,13 +2984,15 @@ class Builder
     }
 
     /**
-     * Update a record in the database.
+     * Update records in the database.
      *
      * @param  array  $values
      * @return int
      */
     public function update(array $values)
     {
+        $this->applyBeforeQueryCallbacks();
+
         $sql = $this->grammar->compileUpdate($this, $values);
 
         return $this->connection->update($sql, $this->cleanBindings(
@@ -2889,6 +3018,51 @@ class Builder
         }
 
         return (bool) $this->limit(1)->update($values);
+    }
+
+    /**
+     * Insert new records or update the existing ones.
+     *
+     * @param  array  $values
+     * @param  array|string  $uniqueBy
+     * @param  array|null  $update
+     * @return int
+     */
+    public function upsert(array $values, $uniqueBy, $update = null)
+    {
+        if (empty($values)) {
+            return 0;
+        } elseif ($update === []) {
+            return (int) $this->insert($values);
+        }
+
+        if (! is_array(reset($values))) {
+            $values = [$values];
+        } else {
+            foreach ($values as $key => $value) {
+                ksort($value);
+
+                $values[$key] = $value;
+            }
+        }
+
+        if (is_null($update)) {
+            $update = array_keys(reset($values));
+        }
+
+        $this->applyBeforeQueryCallbacks();
+
+        $bindings = $this->cleanBindings(array_merge(
+            Arr::flatten($values, 1),
+            collect($update)->reject(function ($value, $key) {
+                return is_int($key);
+            })->all()
+        ));
+
+        return $this->connection->affectingStatement(
+            $this->grammar->compileUpsert($this, $values, (array) $uniqueBy, $update),
+            $bindings
+        );
     }
 
     /**
@@ -2938,7 +3112,7 @@ class Builder
     }
 
     /**
-     * Delete a record from the database.
+     * Delete records from the database.
      *
      * @param  mixed  $id
      * @return int
@@ -2951,6 +3125,8 @@ class Builder
         if (! is_null($id)) {
             $this->where($this->from.'.id', '=', $id);
         }
+
+        $this->applyBeforeQueryCallbacks();
 
         return $this->connection->delete(
             $this->grammar->compileDelete($this), $this->cleanBindings(
@@ -2966,6 +3142,8 @@ class Builder
      */
     public function truncate()
     {
+        $this->applyBeforeQueryCallbacks();
+
         foreach ($this->grammar->compileTruncate($this) as $sql => $bindings) {
             $this->connection->statement($sql, $bindings);
         }
@@ -3085,7 +3263,7 @@ class Builder
      * @param  array  $bindings
      * @return array
      */
-    protected function cleanBindings(array $bindings)
+    public function cleanBindings(array $bindings)
     {
         return array_values(array_filter($bindings, function ($binding) {
             return ! $binding instanceof Expression;
@@ -3170,6 +3348,16 @@ class Builder
     }
 
     /**
+     * Clone the query.
+     *
+     * @return static
+     */
+    public function clone()
+    {
+        return clone $this;
+    }
+
+    /**
      * Clone the query without the given properties.
      *
      * @param  array  $properties
@@ -3177,7 +3365,7 @@ class Builder
      */
     public function cloneWithout(array $properties)
     {
-        return tap(clone $this, function ($clone) use ($properties) {
+        return tap($this->clone(), function ($clone) use ($properties) {
             foreach ($properties as $property) {
                 $clone->{$property} = null;
             }
@@ -3192,7 +3380,7 @@ class Builder
      */
     public function cloneWithoutBindings(array $except)
     {
-        return tap(clone $this, function ($clone) use ($except) {
+        return tap($this->clone(), function ($clone) use ($except) {
             foreach ($except as $type) {
                 $clone->bindings[$type] = [];
             }

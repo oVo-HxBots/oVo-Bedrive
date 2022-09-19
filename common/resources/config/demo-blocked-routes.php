@@ -6,6 +6,8 @@ return [
     ['method' => 'POST', 'name' => 'admin/appearance'],
     ['method' => 'POST', 'name' => 'cache/clear'],
     ['method' => 'POST', 'name' => 'artisan/call'],
+    ['method' => 'POST', 'name' => 'admin/search/import'],
+    ['method' => 'POST', 'name' => 'import-media/single-item'],
 
     // css theme
     ['method' => 'POST', 'name' => 'css-theme'],

@@ -48,14 +48,10 @@ trait Billable
 
     /**
      * Check if user is subscribed to specified plan and gateway.
-     *
-     * @param BillingPlan $plan
-     * @param string $gateway
-     * @return bool
      */
-    public function subscribedTo(BillingPlan $plan, $gateway) {
+    public function subscribedTo(BillingPlan $plan, string $gateway): bool {
         return ! is_null($this->subscriptions->first(function(Subscription $sub) use($plan, $gateway) {
-            return $sub->valid && $sub->plan_id === $plan->id && $sub->gateway === $gateway;
+            return $sub->valid && $sub->plan_id === $plan->id && $sub->gateway_name === $gateway;
         }));
     }
 
@@ -65,6 +61,6 @@ trait Billable
     public function subscriptions()
     {
         // always return subscriptions that are not attached to any gateway last
-        return $this->hasMany(Subscription::class, 'user_id')->orderBy(DB::raw('FIELD(gateway, "none")'), 'asc');
+        return $this->hasMany(Subscription::class, 'user_id')->orderBy(DB::raw('FIELD(gateway_name, "none")'), 'asc');
     }
 }

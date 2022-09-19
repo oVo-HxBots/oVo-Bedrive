@@ -3,6 +3,7 @@
 namespace Common\Files\Response;
 
 use Common\Files\FileEntry;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -29,7 +30,12 @@ class StreamedFileResponse implements FileResponse
             'Content-Disposition' => $disposition,
         ]);
         $response->setCallback(function () use ($entry, $path) {
-            $stream = $entry->getDisk()->readStream($path);
+            try {
+                $stream = $entry->getDisk()->readStream($path);
+            } catch (FileNotFoundException $e) {
+                abort(404);
+            }
+            
             while ( ! feof($stream)) {
                 echo fread($stream, 2048);
             }

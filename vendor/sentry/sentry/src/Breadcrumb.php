@@ -11,7 +11,7 @@ use Sentry\Exception\InvalidArgumentException;
  *
  * @author Stefano Arlandini <sarlandini@alice.it>
  */
-final class Breadcrumb implements \JsonSerializable
+final class Breadcrumb
 {
     /**
      * This constant defines the default breadcrumb type.
@@ -59,13 +59,6 @@ final class Breadcrumb implements \JsonSerializable
     public const LEVEL_ERROR = 'error';
 
     /**
-     * This constant defines the critical level for a breadcrumb.
-     *
-     * @deprecated since version 2.2.2, to be removed in 3.0; use fatal instead.
-     */
-    public const LEVEL_CRITICAL = 'critical';
-
-    /**
      * This constant defines the fatal level for a breadcrumb.
      */
     public const LEVEL_FATAL = 'fatal';
@@ -79,7 +72,6 @@ final class Breadcrumb implements \JsonSerializable
         self::LEVEL_INFO,
         self::LEVEL_WARNING,
         self::LEVEL_ERROR,
-        self::LEVEL_CRITICAL,
         self::LEVEL_FATAL,
     ];
 
@@ -116,13 +108,14 @@ final class Breadcrumb implements \JsonSerializable
     /**
      * Constructor.
      *
-     * @param string               $level    The error level of the breadcrumb
-     * @param string               $type     The type of the breadcrumb
-     * @param string               $category The category of the breadcrumb
-     * @param string|null          $message  Optional text message
-     * @param array<string, mixed> $metadata Additional information about the breadcrumb
+     * @param string               $level     The error level of the breadcrumb
+     * @param string               $type      The type of the breadcrumb
+     * @param string               $category  The category of the breadcrumb
+     * @param string|null          $message   Optional text message
+     * @param array<string, mixed> $metadata  Additional information about the breadcrumb
+     * @param float|null           $timestamp Optional timestamp of the breadcrumb
      */
-    public function __construct(string $level, string $type, string $category, ?string $message = null, array $metadata = [])
+    public function __construct(string $level, string $type, string $category, ?string $message = null, array $metadata = [], ?float $timestamp = null)
     {
         if (!\in_array($level, self::ALLOWED_LEVELS, true)) {
             throw new InvalidArgumentException('The value of the $level argument must be one of the Breadcrumb::LEVEL_* constants.');
@@ -133,44 +126,7 @@ final class Breadcrumb implements \JsonSerializable
         $this->category = $category;
         $this->message = $message;
         $this->metadata = $metadata;
-        $this->timestamp = microtime(true);
-    }
-
-    /**
-     * Maps the severity of the error to one of the levels supported by the
-     * breadcrumbs.
-     *
-     * @param \ErrorException $exception The exception
-     *
-     * @deprecated since version 2.3, to be removed in 3.0
-     */
-    public static function levelFromErrorException(\ErrorException $exception): string
-    {
-        @trigger_error(sprintf('Method %s() is deprecated since version 2.3 and will be removed in 3.0.', __METHOD__), \E_USER_DEPRECATED);
-
-        switch ($exception->getSeverity()) {
-            case \E_DEPRECATED:
-            case \E_USER_DEPRECATED:
-            case \E_WARNING:
-            case \E_USER_WARNING:
-            case \E_RECOVERABLE_ERROR:
-                return self::LEVEL_WARNING;
-            case \E_ERROR:
-            case \E_PARSE:
-            case \E_CORE_ERROR:
-            case \E_CORE_WARNING:
-            case \E_COMPILE_ERROR:
-            case \E_COMPILE_WARNING:
-                return self::LEVEL_FATAL;
-            case \E_USER_ERROR:
-                return self::LEVEL_ERROR;
-            case \E_NOTICE:
-            case \E_USER_NOTICE:
-            case \E_STRICT:
-                return self::LEVEL_INFO;
-            default:
-                return self::LEVEL_ERROR;
-        }
+        $this->timestamp = $timestamp ?? microtime(true);
     }
 
     /**
@@ -346,20 +302,22 @@ final class Breadcrumb implements \JsonSerializable
     }
 
     /**
-     * Gets the breadcrumb as an array.
+     * Sets the breadcrumb timestamp.
      *
-     * @return array<string, mixed>
+     * @param float $timestamp The timestamp
+     *
+     * @return static
      */
-    public function toArray(): array
+    public function withTimestamp(float $timestamp): self
     {
-        return [
-            'type' => $this->type,
-            'category' => $this->category,
-            'level' => $this->level,
-            'message' => $this->message,
-            'timestamp' => $this->timestamp,
-            'data' => $this->metadata,
-        ];
+        if ($timestamp === $this->timestamp) {
+            return $this;
+        }
+
+        $new = clone $this;
+        $new->timestamp = $timestamp;
+
+        return $new;
     }
 
     /**
@@ -371,8 +329,9 @@ final class Breadcrumb implements \JsonSerializable
      *     level: string,
      *     type?: string,
      *     category: string,
-     *     message?: string,
-     *     data?: array<string, mixed>
+     *     message?: string|null,
+     *     data?: array<string, mixed>,
+     *     timestamp?: float|null
      * } $data
      */
     public static function fromArray(array $data): self
@@ -382,17 +341,8 @@ final class Breadcrumb implements \JsonSerializable
             $data['type'] ?? self::TYPE_DEFAULT,
             $data['category'],
             $data['message'] ?? null,
-            $data['data'] ?? []
+            $data['data'] ?? [],
+            $data['timestamp'] ?? null
         );
-    }
-
-    /**
-     * {@inheritdoc}
-     *
-     * @return array<string, mixed>
-     */
-    public function jsonSerialize(): array
-    {
-        return $this->toArray();
     }
 }

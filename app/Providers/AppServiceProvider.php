@@ -8,11 +8,10 @@ use App\Services\Entries\SetPermissionsOnEntry;
 use Common\Admin\Analytics\Actions\GetAnalyticsHeaderDataAction;
 use Common\Files\FileEntry as CommonFileEntry;
 use Common\Workspaces\ActiveWorkspace;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 
-const WORKSPACED_RESOURCES = [
-    \App\FileEntry::class,
-];
+const WORKSPACED_RESOURCES = [\App\FileEntry::class];
 
 const WORKSPACE_HOME_ROUTE = '/drive';
 
@@ -27,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(
             GetAnalyticsHeaderDataAction::class,
-            GetAnalyticsHeaderData::class
+            GetAnalyticsHeaderData::class,
         );
 
         $this->app->bind(CommonFileEntry::class, FileEntry::class);
@@ -35,5 +34,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SetPermissionsOnEntry::class, function () {
             return new SetPermissionsOnEntry();
         });
+    }
+
+    public function boot()
+    {
+        Model::preventLazyLoading(!app()->isProduction());
     }
 }

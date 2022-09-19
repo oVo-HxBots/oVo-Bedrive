@@ -1,6 +1,6 @@
 <?php
 
-define('MINIMUM_VERSION', '7.2.5');
+define('MINIMUM_VERSION', '7.3');
 if ( ! version_compare(PHP_VERSION, MINIMUM_VERSION)) exit('You need at least PHP '.MINIMUM_VERSION.' to install this application.');
 
 /*

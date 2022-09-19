@@ -79,6 +79,7 @@ class UploadFile
     {
         // only create thumbnail for images over 500KB in size
         if ($entry->type === 'image' && $entry->file_size > 500000) {
+            @ini_set('memory_limit','256M');
             $img = Image::make($contents)->orientate();
 
             $img->fit(350, 250, function (Constraint $constraint) {

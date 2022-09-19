@@ -47,6 +47,9 @@ trait HandlesEntryPaths
             ->update(['path' => DB::raw("REPLACE(path, '$oldPath', '$newPath')")]);
     }
 
+    /**
+     * Loads current model as well as all children currently.
+     */
     public function scopeAllChildren(Builder $builder): Builder
     {
         return $builder->where('path', 'like', $this->attributes['path'].'%');

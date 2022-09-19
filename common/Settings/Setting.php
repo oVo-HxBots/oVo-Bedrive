@@ -5,6 +5,8 @@ use Eloquent;
 use Illuminate\Database\Eloquent\Model;
 
 /**
+ * Common\Settings\Setting
+ *
  * @property int $id
  * @property string $name
  * @property string $value
@@ -12,6 +14,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property Carbon $updated_at
  * @property int $private
  * @mixin Eloquent
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting query()
  */
 class Setting extends Model {
 

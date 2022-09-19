@@ -46,6 +46,10 @@ class CrupdateComment
             $attributes['parent_id'] = $inReplyTo['id'];
         }
 
+        if (isset($attributes['commentable_type'])) {
+            // track => App\Track
+            $attributes['commentable_type'] = 'App\\' . ucfirst($data['commentable_type']);
+        }
         $comment->fill($attributes)->save();
 
         $comment->generatePath();

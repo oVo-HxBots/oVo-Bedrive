@@ -19,25 +19,18 @@ class HomeController extends BaseController {
      */
     private $settings;
 
-    /**
-     * @param BootstrapData $bootstrapData
-     * @param Settings $settings
-     */
     public function __construct(BootstrapData $bootstrapData, Settings $settings)
     {
         $this->bootstrapData = $bootstrapData;
         $this->settings = $settings;
     }
 
-    /**
-	 * @return View|Response
-	 */
 	public function show()
 	{
 	    // only get meta tags if we're actually
         // rendering homepage and not a fallback route
         $data = [];
-	    if (request()->route()->uri === '/' && $response = $this->handleSeo($data)) {
+	    if (request()->path() === '/' && $response = $this->handleSeo($data)) {
             return $response;
         }
 

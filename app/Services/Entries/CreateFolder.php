@@ -13,21 +13,14 @@ class CreateFolder
      */
     private $folder;
 
-    /**
-     * @param Folder $folder
-     */
     public function __construct(Folder $folder)
     {
         $this->folder = $folder;
     }
 
-    /**
-     * @param array $data
-     * @return Folder
-     */
-    public function execute($data)
+    public function execute(array $data): Folder
     {
-        $userId = $data['userId'];
+        $ownerId = $data['ownerId'];
         $parentId = Arr::get($data, 'parentId');
         $folderName = $data['name'];
 
@@ -36,7 +29,7 @@ class CreateFolder
             ->where('workspace_id', app(ActiveWorkspace::class)->id)
             ->where('name', $data['name'])
             ->where('type', 'folder')
-            ->whereOwner($userId)
+            ->whereOwner($ownerId)
             ->first();
 
         if ( ! is_null($exists)) {
@@ -47,11 +40,12 @@ class CreateFolder
             'name' => $folderName,
             'file_name' => $folderName,
             'parent_id' => $parentId,
+            'owner_id' => $ownerId,
         ]);
 
         $folder->generatePath();
 
-        $folder->users()->attach($userId, ['owner' => true]);
+        $folder->users()->attach($ownerId, ['owner' => true]);
 
         return $folder;
     }

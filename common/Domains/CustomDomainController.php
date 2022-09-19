@@ -2,19 +2,20 @@
 
 namespace Common\Domains;
 
+use Arr;
 use Auth;
 use Common\Core\AppUrl;
 use Common\Core\BaseController;
 use Common\Core\HttpClient;
-use Common\Database\Paginator;
+use Common\Database\Datasource\MysqlDataSource;
 use Common\Domains\Actions\DeleteCustomDomains;
-use Common\Settings\Settings;
+use Common\Workspaces\ActiveWorkspace;
+use Exception;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
-
 
 class CustomDomainController extends BaseController
 {
@@ -30,39 +31,30 @@ class CustomDomainController extends BaseController
      */
     private $request;
 
-    /**
-     * @param CustomDomain $customDomain
-     * @param Request $request
-     */
     public function __construct(CustomDomain $customDomain, Request $request)
     {
         $this->customDomain = $customDomain;
         $this->request = $request;
     }
 
-    /**
-     * @return Response
-     */
     public function index()
     {
         $userId = $this->request->get('userId');
         $this->authorize('index', [get_class($this->customDomain), $userId]);
 
-        $paginator = new Paginator($this->customDomain, $this->request->all());
-        $paginator->searchColumn = 'host';
-
+        $builder = $this->customDomain->newQuery();
         if ($userId) {
-            $paginator->where('user_id', $userId);
-        } else {
-            $paginator->with('user');
+            $builder->where('user_id', '=', $userId);
         }
 
-        return $this->success(['pagination' => $paginator->paginate()]);
+        $datasource = new MysqlDataSource(
+            $builder,
+            $this->request->all(),
+        );
+
+        return $this->success(['pagination' => $datasource->paginate()]);
     }
 
-    /**
-     * @return Response
-     */
     public function store()
     {
         $this->authorize('store', get_class($this->customDomain));
@@ -76,21 +68,22 @@ class CustomDomainController extends BaseController
             'host' => $this->request->get('host'),
             'user_id' => Auth::id(),
             'global' => $this->request->get('global', false),
+            'workspace_id' => app(ActiveWorkspace::class)->id,
         ]);
 
         return $this->success(['domain' => $domain]);
     }
 
-    /**
-     * @param CustomDomain $customDomain
-     * @return Response
-     */
     public function update(CustomDomain $customDomain)
     {
         $this->authorize('store', $customDomain);
 
         $this->validate($this->request, [
-            'host' => ['string', 'max:100', Rule::unique('custom_domains')->ignore($customDomain->id)],
+            'host' => [
+                'string',
+                'max:100',
+                Rule::unique('custom_domains')->ignore($customDomain->id),
+            ],
             'global' => 'boolean',
             'resource_id' => 'integer',
             'resource_type' => 'string',
@@ -104,14 +97,13 @@ class CustomDomainController extends BaseController
         return $this->success(['domain' => $domain]);
     }
 
-    /**
-     * @param string $ids
-     * @return Response
-     */
-    public function destroy($ids)
+    public function destroy(string $ids)
     {
         $domainIds = explode(',', $ids);
-        $this->authorize('destroy', [get_class($this->customDomain), $domainIds]);
+        $this->authorize('destroy', [
+            get_class($this->customDomain),
+            $domainIds,
+        ]);
 
         app(DeleteCustomDomains::class)->execute($domainIds);
 
@@ -125,36 +117,72 @@ class CustomDomainController extends BaseController
         $domainId = $this->request->get('domainId');
 
         // don't allow attaching current site url as custom domain
-        if (app(AppUrl::class)->requestHostMatches($this->request->get('host'))) {
-            return $this->error('', ['host' => 'This domain is not valid.']);
+        if (
+            app(AppUrl::class)->requestHostMatches($this->request->get('host'))
+        ) {
+            return $this->error('', [
+                'host' => __(
+                    "Current site url can't be attached as custom domain.",
+                ),
+            ]);
         }
 
         $this->validate($this->request, [
-            'host' => ['required', 'string', 'max:100', Rule::unique('custom_domains')->ignore($domainId)],
+            'host' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('custom_domains')->ignore($domainId),
+            ],
         ]);
 
         return $this->success([
-            'serverIp' => env('SERVER_IP') ??  env('SERVER_ADDR') ?? env('LOCAL_ADDR') ?? env('REMOTE_ADDR')
+            'serverIp' => $this->getServerIp(),
         ]);
     }
 
     /**
      * Proxy method for validation on frontend to avoid cross-domain issues.
-     *
-     * @return array|JsonResponse|string
      */
     public function validateDomainApi()
     {
         $this->validate($this->request, [
             'host' => 'required|string',
         ]);
-        $http = new HttpClient(['verify' => false]);
-        $host = trim($this->request->get('host'), '/');
+
+        $failReason = '';
+
         try {
-            return $http->get("$host/" . self::VALIDATE_CUSTOM_DOMAIN_PATH);
-        } catch (RequestException $e) {
-            return $this->error(__('Could not validate domain.'));
+            $host = parse_url($this->request->get('host'), PHP_URL_HOST);
+            $dns = dns_get_record($host ?? $this->request->get('host'));
+        } catch (Exception $e) {
+            $dns = [];
         }
+
+        $recordWithIp = Arr::first($dns, function ($record) {
+            return isset($record['ip']);
+        });
+        if (
+            empty($dns) ||
+            (isset($recordWithIp) &&
+                $recordWithIp['ip'] !== $this->getServerIp())
+        ) {
+            $failReason = 'dnsNotSetup';
+        }
+
+        if (!$failReason) {
+            $http = new HttpClient(['verify' => false]);
+            $host = trim($this->request->get('host'), '/');
+            try {
+                return $http->get("$host/" . self::VALIDATE_CUSTOM_DOMAIN_PATH);
+            } catch (RequestException | ConnectException $e) {
+                $failReason = 'serverNotConfigured';
+            }
+        }
+
+        return $this->error(__('Could not validate domain.'), [], 422, [
+            'failReason' => $failReason,
+        ]);
     }
 
     /**
@@ -164,5 +192,11 @@ class CustomDomainController extends BaseController
     public function validateDomain()
     {
         return $this->success(['result' => 'connected']);
+    }
+
+    private function getServerIp(): string
+    {
+        return env('SERVER_IP') ??
+            (env('SERVER_ADDR') ?? (env('LOCAL_ADDR') ?? env('REMOTE_ADDR')));
     }
 }

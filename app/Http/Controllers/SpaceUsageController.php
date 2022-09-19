@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\GetDriveSpaceUsage;
 use Auth;
 use Common\Core\BaseController;
+use Common\Files\Actions\GetUserSpaceUsage;
 use Illuminate\Http\JsonResponse;
 
 class SpaceUsageController extends BaseController
@@ -13,7 +13,7 @@ class SpaceUsageController extends BaseController
     {
         $this->authorize('show', Auth::user());
 
-        $usage = app(GetDriveSpaceUsage::class)->execute();
+        $usage = app(GetUserSpaceUsage::class)->execute(Auth::user());
 
         return $this->success($usage);
     }

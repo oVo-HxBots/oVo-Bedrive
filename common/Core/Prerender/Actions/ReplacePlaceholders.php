@@ -2,9 +2,9 @@
 
 namespace Common\Core\Prerender\Actions;
 
+use Common\Core\Contracts\AppUrlGenerator;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Arr;
-use Common\Core\Contracts\AppUrlGenerator;
 use Illuminate\Support\Str;
 
 class ReplacePlaceholders
@@ -118,7 +118,7 @@ class ReplacePlaceholders
         return preg_replace_callback('/{{([\w\.\-\?\:]+?)}}/', function($matches) use($data) {
             if ( ! isset($matches[1])) return $matches[0];
 
-            $placeholder = strtolower($matches[1]);
+            $placeholder = $matches[1];
 
             // replace site name
             if ($placeholder === 'site_name') {

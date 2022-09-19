@@ -12,6 +12,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property-read Subscription $subscription
  * @mixin Eloquent
+ * @property int $id
+ * @property int $subscription_id
+ * @property int $paid
+ * @property string $uuid
+ * @property string|null $notes
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @method static \Illuminate\Database\Eloquent\Builder|Invoice newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Invoice newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Invoice query()
  */
 class Invoice extends Model
 {

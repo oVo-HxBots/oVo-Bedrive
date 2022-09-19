@@ -37,25 +37,17 @@ trait HandlesSeo
         }
     }
 
-    /**
-     * @param array $data
-     * @param array $options
-     * @return MetaTags|void
-     */
-    protected function getMetaTags($data = [], $options = [])
+    protected function getMetaTags($data = [], $options = []): ?MetaTags
     {
         $namespace = Arr::get($options, 'prerender.config', $this->namespaceFromRouteAction());
-
         if ($seoConfig = config("seo.$namespace")) {
             $dataForSeo = Arr::get($options, 'prerender.dataForSeo') ?: $data;
             return new MetaTags($seoConfig, $dataForSeo, $namespace);
         }
+        return null;
     }
 
-    /**
-     * @return string
-     */
-    protected function namespaceFromRouteAction()
+    protected function namespaceFromRouteAction(): string
     {
         // 'App/Http/Controllers/ArtistController@show'
         $uses = request()->route()->action['uses'];

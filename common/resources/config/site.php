@@ -22,4 +22,5 @@ return [
     'verify_paypal_webhook' => env('VERIFY_PAYPAL_WEBHOOK', false),
     'trust_all_proxies' => env('TRUST_ALL_PROXIES', false),
     'has_mobile_app' => env('HAS_MOBILE_APP', false),
+    'scout_mysql_mode' => env('SCOUT_MYSQL_MODE', 'extended'),
 ];

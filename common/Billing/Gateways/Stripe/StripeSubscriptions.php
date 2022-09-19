@@ -79,17 +79,22 @@ class StripeSubscriptions implements GatewaySubscriptionsInterface
             throw new GatewayException("Stripe subscription creation failed: {$response->getMessage()}");
         }
 
-        if ($response->getData()['latest_invoice']['payment_intent']['status'] === 'requires_action') {
+        $data = $response->getData();
+
+        if ($data['latest_invoice']['payment_intent']['status'] === 'requires_action') {
             $status = 'requires_action';
-        } else {
+        } else if ($data['status'] === 'active') {
             $status = 'complete';
+        } else {
+            $status = 'incomplete';
         }
 
         return [
             'status' => $status,
-            'payment_intent_secret' => $response->getData()['latest_invoice']['payment_intent']['client_secret'],
+            'payment_intent_secret' => $data['latest_invoice']['payment_intent']['client_secret'],
             'reference' => $response->getSubscriptionReference(),
-            'end_date' => $response->getData()['current_period_end'],
+            'end_date' => $data['current_period_end'],
+            'last_payment_error' => $data['latest_invoice']['payment_intent']['last_payment_error'] ?? null,
         ];
     }
 
@@ -103,6 +108,10 @@ class StripeSubscriptions implements GatewaySubscriptionsInterface
      */
     public function cancel(Subscription $subscription, $atPeriodEnd = true)
     {
+        if ( ! $subscription->user->stripe_id) {
+            return true;
+        }
+
         // cancel subscription at current period end and don't delete
         if ($atPeriodEnd) {
             $request = $this->gateway->updateSubscription([

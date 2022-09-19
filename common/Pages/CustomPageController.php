@@ -2,11 +2,8 @@
 
 use Auth;
 use Common\Core\BaseController;
-use Common\Database\Paginator;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\JsonResponse;
+use Common\Database\Datasource\MysqlDataSource;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 use Str;
 
@@ -24,10 +21,7 @@ class CustomPageController extends BaseController
 
     /**
      * CustomPage model might get overwritten with
-     * parent page model for example, LinkPage
-     *
-     * @param CustomPage $page
-     * @param Request $request
+     * parent page model, for example, LinkPage
      */
     public function __construct(CustomPage $page, Request $request)
     {
@@ -35,44 +29,41 @@ class CustomPageController extends BaseController
         $this->request = $request;
     }
 
-    /**
-     * @return JsonResponse
-     */
     public function index()
     {
         $userId = $this->request->get('userId');
         $this->authorize('index', [get_class($this->page), $userId]);
 
-        $paginator = new Paginator($this->page, $this->request->all());
-        $paginator->with('user');
-        if ($type = $this->request->get('type')) {
-            $paginator->where('type', $type);
+        $builder = $this->page->newQuery();
+
+        // make sure we filter by page type on full text engines for
+        // example, only search "link page" on "meilisearch" on "belink"
+        $modelType = $this->page::PAGE_TYPE;
+        $pageType = $this->request->get(
+            'type',
+            $modelType !== 'default' ? $modelType : null,
+        );
+        if ($pageType) {
+            $builder->where('type', '=', $pageType);
         }
 
         if ($userId) {
-            $paginator->where('user_id', $userId);
+            $builder->where('user_id', '=', $userId);
         }
 
-        $paginator->searchCallback = function(Builder $query, $term) {
-            $query->where('slug', 'LIKE', "%$term%");
-            $query->orWhere('body', 'LIKE', "$term%");
-        };
+        $pagination = (new MysqlDataSource($builder, $this->request->all()))
+            ->paginate()
+            ->toArray();
 
-        $pagination = $paginator->paginate();
-
-        $pagination->transform(function($page) {
-            $page->body = Str::limit(strip_tags($page->body), 50);
+        $pagination['data'] = array_map(function ($page) {
+            $page['body'] = Str::limit(strip_tags($page['body']), 50);
             return $page;
-        });
+        }, $pagination['data']);
 
         return $this->success(['pagination' => $pagination]);
     }
 
-    /**
-     * @param int $id
-     * @return JsonResponse
-     */
-    public function show($id)
+    public function show(int $id)
     {
         $page = $this->page->findOrFail($id);
         $this->authorize('show', $page);
@@ -80,69 +71,68 @@ class CustomPageController extends BaseController
         return $this->success(['page' => $page]);
     }
 
-    /**
-     * @return Response
-     */
     public function store()
     {
         $this->authorize('store', get_class($this->page));
 
         $validatedData = $this->validate($this->request, [
             'title' => [
-                'string', 'min:3', 'max:250',
-                Rule::unique('custom_pages')->where('user_id', Auth::id())
+                'string',
+                'min:3',
+                'max:250',
+                Rule::unique('custom_pages')->where('user_id', Auth::id()),
             ],
             'slug' => [
-                'nullable', 'string', 'min:3', 'max:250',
+                'nullable',
+                'string',
+                'min:3',
+                'max:250',
                 Rule::unique('custom_pages'),
             ],
-            'body' => "required|string|min:1",
+            'body' => 'required|string|min:1',
             'hide_nav' => 'boolean',
         ]);
 
         $page = app(CrupdatePage::class)->execute(
             $this->page->newInstance(),
-            $validatedData
+            $validatedData,
         );
 
         return $this->success(['page' => $page]);
     }
 
-    /**
-     * @param int $id
-     * @return JsonResponse
-     */
-    public function update($id)
+    public function update(int $id)
     {
         $page = $this->page->findOrFail($id);
         $this->authorize('update', $page);
 
         $validatedData = $this->validate($this->request, [
             'title' => [
-                'required', 'string', 'min:3', 'max:250',
-                Rule::unique('custom_pages')->where('user_id', $page->user_id)->ignore($page->id),
+                'required',
+                'string',
+                'min:3',
+                'max:250',
+                Rule::unique('custom_pages')
+                    ->where('user_id', $page->user_id)
+                    ->ignore($page->id),
             ],
             'slug' => [
-                'nullable', 'string', 'min:3', 'max:250',
+                'nullable',
+                'string',
+                'min:3',
+                'max:250',
                 Rule::unique('custom_pages')->ignore($page->id),
             ],
-            'body' => "required|string|min:1",
+            'body' => 'required|string|min:1',
             'hide_nav' => 'boolean',
         ]);
 
-        $page = app(CrupdatePage::class)->execute(
-            $page,
-            $validatedData
-        );
+        $page = app(CrupdatePage::class)->execute($page, $validatedData);
 
         return $this->success(['page' => $page]);
     }
 
-    /**
-     * @param string $ids
-     * @return Response
-     */
-    public function destroy($ids)
+    public function destroy(string $ids)
     {
         $pageIds = explode(',', $ids);
         $this->authorize('destroy', [get_class($this->page), $pageIds]);

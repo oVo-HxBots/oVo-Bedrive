@@ -15,8 +15,8 @@ class CreateSubscriptionsTable extends Migration
     {
         Schema::create('subscriptions', function ($table) {
             $table->increments('id');
-            $table->integer('user_id');
-            $table->string('plan_id');
+            $table->integer('user_id')->index();
+            $table->string('plan_id')->index();
             $table->string('gateway')->default('none')->index();
             $table->string('gateway_id')->default('none');
             $table->integer('quantity')->default(1);

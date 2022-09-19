@@ -3,7 +3,7 @@
 namespace Common\Database;
 
 use Common\Core\Manifest\BuildManifestFile;
-use DatabaseSeeder;
+use Database\Seeders\DatabaseSeeder;
 use File;
 use Illuminate\Database\Eloquent\Model;
 
@@ -36,7 +36,7 @@ class MigrateAndSeed
         }
 
         // Seed
-        $seeder = app(DatabaseSeeder::class);
+        $seeder = class_exists(\DatabaseSeeder::class) ? app(\DatabaseSeeder::class) : app(DatabaseSeeder::class);
         $seeder->setContainer(app());
         Model::unguarded(function() use($seeder) {
             $seeder->__invoke();

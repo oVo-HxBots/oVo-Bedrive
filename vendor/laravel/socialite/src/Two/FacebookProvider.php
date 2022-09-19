@@ -49,6 +49,13 @@ class FacebookProvider extends AbstractProvider implements ProviderInterface
     protected $reRequest = false;
 
     /**
+     * The access token that was last used to retrieve a user.
+     *
+     * @var string|null
+     */
+    protected $lastToken;
+
+    /**
      * {@inheritdoc}
      */
     protected function getAuthUrl($state)
@@ -83,6 +90,8 @@ class FacebookProvider extends AbstractProvider implements ProviderInterface
      */
     protected function getUserByToken($token)
     {
+        $this->lastToken = $token;
+
         $meUrl = $this->graphUrl.'/'.$this->version.'/me?access_token='.$token.'&fields='.implode(',', $this->fields);
 
         if (! empty($this->clientSecret)) {
@@ -171,6 +180,16 @@ class FacebookProvider extends AbstractProvider implements ProviderInterface
         $this->reRequest = true;
 
         return $this;
+    }
+
+    /**
+     * Get the last access token used.
+     *
+     * @return string|null
+     */
+    public function lastToken()
+    {
+        return $this->lastToken;
     }
 
     /**

@@ -28,11 +28,6 @@ class ShareableLinksController extends BaseController
      */
     private $entry;
 
-    /**
-     * @param Request $request
-     * @param ShareableLink $link
-     * @param FileEntry $entry
-     */
     public function __construct(Request $request, ShareableLink $link, FileEntry $entry)
     {
         $this->request = $request;
@@ -57,14 +52,7 @@ class ShareableLinksController extends BaseController
         return $this->success($response);
     }
 
-    /**
-     * @param int $entryId
-     * @param CrupdateShareableLinkRequest $request
-     * @param CrupdateShareableLink $action
-     *
-     * @return JsonResponse
-     */
-    public function store($entryId, CrupdateShareableLinkRequest $request, CrupdateShareableLink $action)
+    public function store(int $entryId, CrupdateShareableLinkRequest $request, CrupdateShareableLink $action)
     {
         $this->authorize('create', ShareableLink::class);
         $this->authorize('update', [FileEntry::class, [$entryId]]);

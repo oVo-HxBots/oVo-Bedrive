@@ -1,12 +1,11 @@
 <?php namespace Common\Files\Controllers;
 
-use File;
-use Image;
 use Common\Core\BaseController;
 use Common\Settings\Setting;
-use Illuminate\Http\Request;
 use Common\Settings\Settings;
-use Illuminate\Http\JsonResponse;
+use File;
+use Illuminate\Http\Request;
+use Image;
 
 class UploadFaviconController extends BaseController
 {
@@ -37,19 +36,12 @@ class UploadFaviconController extends BaseController
         [512, 512],
     ];
 
-    /**
-     * @param Request $request
-     * @param Settings $settings
-     */
     public function __construct(Request $request, Settings $settings)
     {
         $this->request = $request;
         $this->settings = $settings;
     }
 
-    /**
-     * @return JsonResponse
-     */
     public function store()
     {
         $this->authorize('update', Setting::class);
@@ -58,21 +50,14 @@ class UploadFaviconController extends BaseController
             'file' => 'required|file'
         ]);
 
-        $faviconPath = public_path(self::FAVICON_DIR);
-        if ( ! File::exists($faviconPath)) {
-            File::makeDirectory($faviconPath);
+        if ( ! File::exists($this->absoluteFaviconDir())) {
+            File::makeDirectory($this->absoluteFaviconDir());
         }
 
         foreach ($this->sizes as $size) {
-            $img = Image::make($this->request->file('file'));
-
-            $img->fit($size[0], $size[1]);
-
-            $img->encode('png');
-
-            $name = "icon-$size[0]x$size[1].png";
-            File::put("$faviconPath/$name", $img);
+           $this->saveFaviconForSize($size);
         }
+        $this->saveFaviconForSize([16, 16], public_path(), 'favicon.ico');
 
         $uri = self::FAVICON_DIR . '/icon-144x144.png';
         $this->settings->save(['branding.favicon' => $uri]);
@@ -80,5 +65,29 @@ class UploadFaviconController extends BaseController
         // need to set url as file entry for appearance
         // image input to preview image properly
         return $this->success(['fileEntry' => ['url' => $uri]]);
+    }
+
+    private function saveFaviconForSize(array $size, string $dir = null, string $name = null)
+    {
+        $img = Image::make($this->request->file('file'));
+
+        $img->fit($size[0], $size[1]);
+
+        $img->encode('png');
+
+        if ( ! $dir) {
+            $dir = $this->absoluteFaviconDir();
+        }
+
+        if ( ! $name) {
+            $name = "icon-$size[0]x$size[1].png";
+        }
+
+        File::put("$dir/$name", $img);
+    }
+
+    private function absoluteFaviconDir(): string
+    {
+        return public_path(self::FAVICON_DIR);
     }
 }

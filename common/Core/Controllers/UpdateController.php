@@ -95,7 +95,7 @@ class UpdateController extends BaseController {
         try {
             return $this->dotEnvEditor->load('env.example')['app_version'];
         } catch (Exception $e) {
-            return null;
+            return config('common.site.version');
         }
     }
 }

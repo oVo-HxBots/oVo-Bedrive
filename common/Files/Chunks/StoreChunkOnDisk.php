@@ -2,6 +2,7 @@
 
 namespace Common\Files\Chunks;
 
+use Exception;
 use File;
 use Illuminate\Http\UploadedFile;
 
@@ -15,7 +16,11 @@ class StoreChunkOnDisk
 
         $chunkPath = "$chunkDir/$chunkIndex";
 
-        File::ensureDirectoryExists($chunkDir);
+        try {
+            File::ensureDirectoryExists($chunkDir);
+        } catch (Exception $e) {
+            //
+        }
 
         $stream = fopen($chunkPath, 'w+b');
         $resource = fopen($chunkFile->getRealPath(), 'r+');

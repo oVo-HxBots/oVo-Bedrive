@@ -5,6 +5,7 @@ use Auth;
 use Carbon\Carbon;
 use Common\Files\Traits\HandlesEntryPaths;
 use Common\Files\Traits\HashesId;
+use Common\Search\Searchable;
 use Common\Tags\HandlesTags;
 use Common\Tags\Tag;
 use Eloquent;
@@ -36,7 +37,7 @@ use Storage;
  * @property-read string $type
  * @property-read FileEntry|null $parent
  * @property-read Collection $users
- * @property-read Collection $owner
+ * @property-read User $owner
  * @property string $path
  * @property string $disk_prefix
  * @property boolean $public
@@ -45,10 +46,32 @@ use Storage;
  * @method static \Illuminate\Database\Query\Builder|FileEntry onlyStarred()
  * @method static \Illuminate\Database\Query\Builder|FileEntry whereRootOrParentNotTrashed()
  * @method whereOwner($userId)
+ * @property int $owner_id
+ * @property string|null $description
+ * @property string|null $password
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read Collection|FileEntry[] $children
+ * @property-read int|null $children_count
+ * @property-read string $hash
+ * @property-read string|null $url
+ * @property-read int|null $users_count
+ * @method static Builder|FileEntry allChildren()
+ * @method static Builder|FileEntry allParents()
+ * @method static Builder|FileEntry basicSearch(string $query)
+ * @method static Builder|FileEntry newModelQuery()
+ * @method static Builder|FileEntry newQuery()
+ * @method static Builder|FileEntry query()
+ * @method static Builder|FileEntry whereHash($value)
+ * @method static Builder|FileEntry whereNotOwner($userId)
+ * @method static Builder|FileEntry whereUser($userId, $owner = null)
+ * @method static \Illuminate\Database\Query\Builder|FileEntry withTrashed()
+ * @method static \Illuminate\Database\Query\Builder|FileEntry withoutTrashed()
+ * @property-read Collection|Tag[] $tags
+ * @property-read int|null $tags_count
  */
 class FileEntry extends Model
 {
-    use SoftDeletes, HashesId, HandlesEntryPaths, HandlesTags;
+    use SoftDeletes, HashesId, HandlesEntryPaths, HandlesTags, Searchable;
 
     protected $guarded = ['id'];
     protected $hidden  = ['pivot', 'preview_token'];
@@ -63,10 +86,7 @@ class FileEntry extends Model
         'workspace_id' => 'integer',
     ];
 
-    /**
-     * @return BelongsToMany
-     */
-    public function users()
+    public function users(): BelongsToMany
     {
         return $this->morphedByMany(FileEntryUser::class, 'model', 'file_entry_models', 'file_entry_id', 'model_id')
             ->using(FileEntryPivot::class)
@@ -76,36 +96,23 @@ class FileEntry extends Model
             ->orderBy('file_entry_models.created_at');
     }
 
-    /**
-     * @return HasMany
-     */
-    public function children()
+    public function children(): HasMany
     {
         return $this->hasMany(static::class, 'parent_id')->withoutGlobalScope('fsType');
     }
 
-    /**
-     * @return BelongsTo
-     */
-    public function parent()
+    public function parent(): BelongsTo
     {
         return $this->belongsTo(static::class, 'parent_id');
     }
 
-    /**
-     * @return BelongsToMany
-     */
-    public function tags()
+    public function tags(): BelongsToMany
     {
         return $this->morphToMany(Tag::class, 'taggable')
-            ->wherePivot('user_id', Auth::user()->id);
+            ->wherePivot('user_id', Auth::id() ?? null);
     }
 
-    /**
-     * @param string $value
-     * @return string
-     */
-    public function getUrlAttribute($value)
+    public function getUrlAttribute(string $value = null): ?string
     {
         if ($value) return $value;
         if ( ! isset($this->attributes['type']) || $this->attributes['type'] === 'folder') {
@@ -121,11 +128,7 @@ class FileEntry extends Model
         }
     }
 
-    /**
-     * @param bool $useThumbnail
-     * @return string
-     */
-    public function getStoragePath($useThumbnail = false)
+    public function getStoragePath(bool $useThumbnail = false): string
     {
         $fileName = $useThumbnail ? 'thumbnail.jpg' : $this->file_name;
         if ($this->public) {
@@ -156,19 +159,9 @@ class FileEntry extends Model
             });
     }
 
-    /**
-     * @return BelongsToMany
-     */
-    public function owner()
+    public function owner(): BelongsTo
     {
-        return $this->users()->wherePivot('owner', true);
-    }
-
-    /**
-     * @return User
-     */
-    public function getOwner() {
-        return $this->owner->first();
+        return $this->belongsTo(User::class);
     }
 
     /**
@@ -180,7 +173,7 @@ class FileEntry extends Model
      * @return Builder
      */
     public function scopeWhereUser(Builder $builder, $userId, $owner = null) {
-        return $builder->whereIn('id', function ($query) use($userId, $owner) {
+        return $builder->whereIn($this->qualifyColumn('id'), function ($query) use($userId, $owner) {
             $query->select('file_entry_id')
                 ->from('file_entry_models')
                 ->where('model_id', $userId)
@@ -203,7 +196,7 @@ class FileEntry extends Model
      * @return Builder
      */
     public function scopeWhereOwner(Builder $builder, $userId) {
-        return $this->scopeWhereUser($builder, $userId, true);
+        return $builder->where('owner_id', $userId);
     }
 
     /**
@@ -214,6 +207,7 @@ class FileEntry extends Model
      * @return Builder
      */
     public function scopeWhereNotOwner(Builder $builder, $userId) {
+        // TODO: maybe refactor this (owner_id was materialized on main table, but still need to fetch all files user is attached to but is not owner of)
         return $this->scopeWhereUser($builder, $userId, false);
     }
 
@@ -252,5 +246,41 @@ class FileEntry extends Model
         } else {
             return $this->file_size;
         }
+    }
+
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'file_size' => $this->file_size,
+            'mime' => $this->mime,
+            'extension' => $this->extension,
+            'owner_id' => $this->owner_id,
+            'created_at' => $this->created_at->timestamp ?? '_null',
+            'updated_at' => $this->updated_at->timestamp ?? '_null',
+            'deleted_at' => $this->deleted_at->timestamp ?? '_null',
+            'public' => $this->public,
+            'description' => $this->description,
+            'password' => $this->password,
+            'type' => $this->type,
+            'workspace_id' => $this->workspace_id ?? '_null',
+        ];
+    }
+
+    public static function filterableFields(): array
+    {
+        return [
+            'id',
+            'owner_id',
+            'created_at',
+            'updated_at',
+            'deleted_at',
+            'file_size',
+            'public',
+            'password',
+            'type',
+            'workspace_id',
+        ];
     }
 }

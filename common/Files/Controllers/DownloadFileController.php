@@ -23,11 +23,6 @@ class DownloadFileController extends BaseController
      */
     protected $fileResponseFactory;
 
-    /**
-     * @param Request $request
-     * @param FileEntry $fileEntry
-     * @param FileResponseFactory $fileResponseFactory
-     */
     public function __construct(Request $request, FileEntry $fileEntry, FileResponseFactory $fileResponseFactory)
     {
         $this->request = $request;

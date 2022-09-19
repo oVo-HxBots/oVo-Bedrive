@@ -2,6 +2,7 @@
 
 use Dotenv\Dotenv;
 use Dotenv\Repository\AdapterRepository;
+use Dotenv\Repository\RepositoryBuilder;
 use Str;
 
 class DotEnvEditor
@@ -16,7 +17,8 @@ class DotEnvEditor
     public function load($fileName = '.env', $path = null)
     {
         $path = $path ?: base_path();
-        $dotEnv = Dotenv::create(new AdapterRepository([], [], true), [$path], $fileName);
+
+        $dotEnv = Dotenv::create(RepositoryBuilder::createWithNoAdapters()->make(), [$path], $fileName);
         $values = $dotEnv->load();
         $lowercaseValues = [];
 

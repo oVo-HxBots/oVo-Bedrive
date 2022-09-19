@@ -4,22 +4,20 @@ namespace Common\Auth\Traits;
 
 use Common\Auth\BaseUser;
 use Storage;
+use Str;
 
 trait HasAvatarAttribute
 {
-    /**
-     * Get user avatar.
-     *
-     * @return string
-     */
-    public function getAvatarAttribute()
+    public function getAvatarAttribute(?string $value)
     {
-        $value = $this->attributes['avatar'];
-
         // absolute link
-        if ($value && \Str::contains($value, '//')) {
+        if ($value && Str::contains($value, '//')) {
             // change google/twitter avatar imported via social login size
-            $value = str_replace('.jpg?sz=50', ".jpg?sz=$this->gravatarSize", $value);
+            $value = str_replace(
+                '.jpg?sz=50',
+                ".jpg?sz=$this->gravatarSize",
+                $value,
+            );
             if ($this->gravatarSize > 50) {
                 // twitter
                 $value = str_replace('_normal.jpg', '.jpg', $value);
@@ -29,7 +27,9 @@ trait HasAvatarAttribute
 
         // relative link (for new and legacy urls)
         if ($value) {
-            return Storage::disk('public')->url($value);
+            return Storage::disk('public')->url(
+                str_replace('storage/', '', $value),
+            );
         }
 
         // gravatar

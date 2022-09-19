@@ -12,10 +12,30 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
+ * Common\Workspaces\WorkspaceMember
+ *
  * @property int $id
  * @property Workspace workspace
  * @property Permission[]|Collection permissions
  * @property boolean is_owner
+ * @property int $user_id
+ * @property int $workspace_id
+ * @property int|null $role_id
+ * @property bool $is_owner
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read mixed $avatar
+ * @property-read string $display_name
+ * @property-read string $model_type
+ * @property-read mixed $role_name
+ * @property-read Collection|Permission[] $permissions
+ * @property-read int|null $permissions_count
+ * @property-read \Common\Workspaces\Workspace $workspace
+ * @method static Builder|WorkspaceMember currentUserAndOwnerOnly()
+ * @method static Builder|WorkspaceMember newModelQuery()
+ * @method static Builder|WorkspaceMember newQuery()
+ * @method static Builder|WorkspaceMember query()
+ * @mixin \Eloquent
  */
 class WorkspaceMember extends Model
 {
@@ -46,8 +66,9 @@ class WorkspaceMember extends Model
 
         return $this;
     }
-    
-    public function getModelTypeAttribute() {
+
+    public static function getModelTypeAttribute(): string
+    {
         return 'member';
     }
 

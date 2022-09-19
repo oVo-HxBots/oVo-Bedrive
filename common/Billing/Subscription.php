@@ -6,7 +6,11 @@ use Common\Billing\Gateways\Contracts\GatewayInterface;
 use Common\Billing\Gateways\GatewayFactory;
 use Carbon\Carbon;
 use Common\Billing\Invoices\Invoice;
+use Common\Billing\Subscriptions\SubscriptionFactory;
+use Common\Search\Fields\SearchableModel;
+use Common\Search\Searchable;
 use Exception;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
@@ -19,12 +23,30 @@ use LogicException;
  * @property-read User $user
  * @property-read BillingPlan $plan
  * @property-read Invoice $latest_invoice
- * @property string $gateway
+ * @property string $gateway_name
  * @property string $gateway_id
  * @property integer $user_id
+ * @property bool $active
+ * @property int $id
+ * @property int $plan_id
+ * @property int $quantity
+ * @property string|null $description
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read mixed $cancelled
+ * @property-read mixed $on_grace_period
+ * @property-read mixed $on_trial
+ * @property-read mixed $valid
+ * @method static \Common\Billing\Subscriptions\SubscriptionFactory factory(...$parameters)
+ * @method static \Illuminate\Database\Eloquent\Builder|Subscription newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Subscription newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Subscription query()
+ * @mixin \Eloquent
  */
 class Subscription extends Model
 {
+    use HasFactory, Searchable;
+
     protected $guarded = ['id'];
 
     protected $appends = [
@@ -163,7 +185,7 @@ class Subscription extends Model
      */
     public function cancel($atPeriodEnd = true)
     {
-        if ($this->gateway !== 'none') {
+        if ($this->gateway_name !== 'none') {
             $this->gateway()->subscriptions()->cancel($this, $atPeriodEnd);
         }
 
@@ -227,7 +249,7 @@ class Subscription extends Model
         // To resume the subscription we need to set the plan parameter on the Stripe
         // subscription object. This will force Stripe to resume this subscription
         // where we left off. Then, we'll set the proper trial ending timestamp.
-        if ($this->gateway !== 'none') {
+        if ($this->gateway_name !== 'none') {
             $this->gateway()->subscriptions()->resume($this, ['trial_end' => $trialEnd]);
         }
 
@@ -259,11 +281,45 @@ class Subscription extends Model
 
     /**
      * Get gateway this subscriptions was created with.
-     * @return GatewayInterface
-     *
      */
-    public function gateway()
+    public function gateway(): GatewayInterface
     {
-        return App::make(GatewayFactory::class)->get($this->gateway);
+        return App::make(GatewayFactory::class)->get($this->gateway_name);
+    }
+
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'plan_id' => $this->plan_id,
+            'gateway_name' => $this->gateway_name,
+            'user' => $this->user ? $this->user->getSearchableValues() : null,
+            'description' => $this->description,
+            'ends_at' => $this->ends_at,
+            'created_at' => $this->created_at->timestamp ?? '_null',
+            'updated_at' => $this->updated_at->timestamp ?? '_null',
+        ];
+    }
+
+    protected function makeAllSearchableUsing($query)
+    {
+        return $query->with(['user']);
+    }
+
+    public static function filterableFields(): array
+    {
+        return [
+            'id',
+            'plan_id',
+            'gateway_name',
+            'ends_at',
+            'created_at',
+            'updated_at',
+        ];
+    }
+
+    protected static function newFactory()
+    {
+        return SubscriptionFactory::new();
     }
 }

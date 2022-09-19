@@ -243,7 +243,6 @@ class Installer
         $user->email = $email;
         $user->password = Hash::make($this->post('password'));
         $user->email_verified_at = now();
-        $user->api_token = Str::random(40);
         $user->save();
         $adminPermission = app(Permission::class)->firstOrCreate(
             ['name' => 'admin'],

@@ -3,7 +3,7 @@
 return [
     [
         'property' => 'og:site_name',
-        'content' => '{{SITE_NAME}}',
+        'content' => '{{site_name}}',
     ],
     [
         'name' => 'twitter:card',

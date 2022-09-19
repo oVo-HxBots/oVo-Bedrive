@@ -11,6 +11,8 @@ use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 
 class Oauth {
 
+    const RETRIEVE_PROFILE_ONLY_KEY = 'retrieveProfileOnly';
+
     private $validProviders = ['google', 'facebook', 'twitter', 'envato'];
 
     /**
@@ -64,20 +66,38 @@ class Oauth {
            return View::make('common::oauth/popup')->with('status', 'ALREADY_LOGGED_IN');
         }
 
-        return $this->connect($provider);
+        return $this->connectCurrentUserTo($provider);
     }
 
     /**
      * Connect currently logged in user to specified social account.
-     *
-     * @param string $provider
      * @return mixed
      */
-    public function connect($provider)
+    public function connectCurrentUserTo(string $providerName)
     {
-        $this->validateProvider($provider);
+        $this->validateProvider($providerName);
 
-        return $this->socialite->with($provider)->redirect();
+        return $this->socialite->driver($providerName)->redirect();
+    }
+
+    /**
+     * Retrieve user details from specified social account without logging user in or connecting accounts.
+     * @return mixed
+     */
+    public function retrieveProfileOnly(string $providerName)
+    {
+        $this->validateProvider($providerName);
+
+        Session::put([Oauth::RETRIEVE_PROFILE_ONLY_KEY => true]);
+
+        $driver = $this->socialite->driver($providerName);
+
+        // get user profile url from facebook
+        if ($providerName === 'facebook') {
+            $driver->scopes(['user_link']);
+        }
+
+        return $driver->redirect();
     }
 
     /**
@@ -225,12 +245,29 @@ class Oauth {
      */
     private function transformSocialProfileData($service, $profile, $user)
     {
-        return $payload = [
+        return [
             'service_name'    => $service,
             'user_service_id' => $this->getUsersIdentifierOnService($profile),
             'user_id'         => $user->id,
             'username'        => $profile->name,
         ];
+    }
+
+    public function returnProfileData($externalProfile)
+    {
+        $normalizedProfile = [
+            'id' => $externalProfile->id,
+            'name' => $externalProfile->name,
+            'email' => $externalProfile->email,
+            'avatar' => $externalProfile->avatar,
+            'profileUrl' => $externalProfile->profileUrl,
+        ];
+
+        if (request()->expectsJson()) {
+            return ['profile' => $normalizedProfile];
+        } else {
+            return $this->getPopupResponse('SUCCESS_PROFILE_RETRIEVE', ['profile' => $normalizedProfile]);
+        }
     }
 
     /**

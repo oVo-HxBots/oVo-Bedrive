@@ -10,12 +10,7 @@ use Illuminate\Support\Collection;
 
 class LoadChildComments
 {
-    /**
-     * @param Model $commentable
-     * @param Collection $rootComments
-     * @return array
-     */
-    public function execute(Model $commentable, Collection $rootComments)
+    public function execute(Model $commentable, Collection $rootComments): Collection
     {
         $paths = $rootComments->map(function(Comment $comment) {
             $path = $comment->getRawOriginal('path');
@@ -35,11 +30,7 @@ class LoadChildComments
             ->orderBy('path', 'asc')
             ->orderBy('created_at', 'desc')
             ->limit(100)
-            ->get()
-            ->map(function(Comment $comment) {
-                $comment->relative_created_at = $comment->created_at->diffForHumans();
-                return $comment;
-            });
+            ->get();
 
         $childComments->each(function($childComment) use($rootComments) {
             $index = $rootComments->search(function($comment) use($childComment) {
@@ -48,6 +39,6 @@ class LoadChildComments
             $rootComments->splice($index + 1, 0, [$childComment]);
         });
 
-        return $rootComments->toArray();
+        return $rootComments;
     }
 }

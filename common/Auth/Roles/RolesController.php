@@ -22,11 +22,6 @@ class RolesController extends BaseController
      */
     private $request;
 
-    /**
-     * @param Request $request
-     * @param Role $role
-     * @param User $user
-     */
     public function __construct(Request $request, Role $role, User $user)
     {
         $this->role = $role;
@@ -97,9 +92,9 @@ class RolesController extends BaseController
      */
     public function destroy($id)
     {
-        $this->authorize('destroy', Role::class);
-
         $role = $this->role->findOrFail($id);
+
+        $this->authorize('destroy', $role);
 
         $role->users()->detach();
         $role->delete();

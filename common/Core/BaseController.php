@@ -1,6 +1,8 @@
 <?php namespace Common\Core;
 
 use App\User;
+use Arr;
+use Auth;
 use Common\Auth\Roles\Role;
 use Common\Core\Prerender\HandlesSeo;
 use Illuminate\Contracts\Auth\Access\Gate;
@@ -11,8 +13,6 @@ use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
-use Arr;
-use Auth;
 
 class BaseController extends Controller
 {
@@ -53,7 +53,8 @@ class BaseController extends Controller
             $data['status'] = 'success';
         }
 
-        if ($response = $this->handleSeo($data, $options)) {
+        // only generate seo tags if request is coming from frontend and not from API
+        if (request()->isFromFrontend() && $response = $this->handleSeo($data, $options)) {
             return $response;
         }
 
@@ -68,15 +69,13 @@ class BaseController extends Controller
 
     /**
      * Return error response with specified messages.
-     *
-     * @param string $message
-     * @param array $errors
-     * @param int $status
-     * @return JsonResponse
      */
-    public function error(string $message = '', array $errors = [], int $status = 422)
+    public function error(string $message = '', array $errors = [], int $status = 422, $data = []): JsonResponse
     {
-        $data = ['message' => $message, 'errors' => $errors ?: []];
+        $data = array_merge(
+            $data,
+            ['message' => $message, 'errors' => $errors ?: []],
+        );
         return response()->json($data, $status);
     }
 }

@@ -43,6 +43,8 @@ use Common\Core\Policies\SubscriptionPolicy;
 use Common\Core\Policies\TagPolicy;
 use Common\Core\Policies\UserPolicy;
 use Common\Core\Prerender\BaseUrlGenerator;
+use Common\Csv\DeleteExpiredCsvExports;
+use Common\Database\AppCursorPaginator;
 use Common\Domains\CustomDomain;
 use Common\Domains\CustomDomainPolicy;
 use Common\Domains\CustomDomainsEnabled;
@@ -60,6 +62,7 @@ use Common\Localizations\Localization;
 use Common\Notifications\NotificationSubscription;
 use Common\Notifications\NotificationSubscriptionPolicy;
 use Common\Pages\CustomPage;
+use Common\Search\Drivers\Mysql\MysqlSearchEngine;
 use Common\Settings\Events\SettingsSaved;
 use Common\Settings\Setting;
 use Common\Settings\Settings;
@@ -77,10 +80,13 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\AliasLoader;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Scout\EngineManager;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\SocialiteServiceProvider;
+use Session;
 use Validator;
 
 require_once 'helpers.php';
@@ -140,6 +146,10 @@ class CommonServiceProvider extends ServiceProvider
 
         $loader = AliasLoader::getInstance();
 
+        Request::macro('isFromFrontend', function() {
+            return Session::isStarted();
+        });
+
         // register socialite service provider and alias
         $this->app->register(SocialiteServiceProvider::class);
         $this->app->register(AnalyticsServiceProvider::class);
@@ -157,6 +167,11 @@ class CommonServiceProvider extends ServiceProvider
             BaseBootstrapData::class
         );
 
+        $this->app->bind(
+            CursorPaginator::class,
+            AppCursorPaginator::class,
+        );
+
         $this->registerDevProviders();
 
         // register flysystem providers
@@ -170,6 +185,11 @@ class CommonServiceProvider extends ServiceProvider
         if ($this->storageDriverSelected('backblaze')) {
             $this->app->register(BackblazeServiceProvider::class);
         }
+
+        // register scout drivers
+        resolve(EngineManager::class)->extend('mysql', function () {
+            return new MysqlSearchEngine();
+        });
     }
 
 
@@ -299,6 +319,7 @@ class CommonServiceProvider extends ServiceProvider
             SyncBillingPlansCommand::class,
             DeleteUploadArtifacts::class,
             SeedCommand::class,
+            DeleteExpiredCsvExports::class,
         ];
 
         if ($this->app->environment() !== 'production') {
@@ -313,7 +334,8 @@ class CommonServiceProvider extends ServiceProvider
         // schedule commands
         $this->app->booted(function () {
             $schedule = $this->app->make(Schedule::class);
-            $schedule->command('uploads:clean')->daily();
+            $schedule->command(DeleteUploadArtifacts::class)->daily();
+            $schedule->command(DeleteExpiredCsvExports::class)->daily();
         });
     }
 
@@ -412,7 +434,9 @@ class CommonServiceProvider extends ServiceProvider
                     app(Workspace::class)->forUser($user->id)->get()->each(function (Workspace $workspace) use($user) {
                         app(RemoveMemberFromWorkspace::class)->execute($workspace, $user->id);
                     });
-                    app(DeleteEntries::class)->execute($user->entries()->pluck('id'));
+                    app(DeleteEntries::class)->execute([
+                        'entryIds' => $user->entries()->pluck('file_entries.id')
+                    ]);
                 });
             });
         }

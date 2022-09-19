@@ -43,6 +43,16 @@ abstract class BasePolicy
         return false;
     }
 
+    protected function userOrGuestHasOneOfPermissions(?User $user, array $permissions)
+    {
+        foreach ($permissions as $permission) {
+            if ($this->userOrGuestHasPermission($user, $permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     protected function denyWithAction($message, array $action = null)
     {
         /** @var AccessResponseWithAction $response */
@@ -52,15 +62,13 @@ abstract class BasePolicy
     }
 
     /**
-     * @param BaseUser $user
-     * @param string $namespace
      * @return bool|AccessResponseWithAction
      */
-    protected function storeWithCountRestriction($user, $namespace) {
+    protected function storeWithCountRestriction(User $user, string $namespace) {
         [$relationName, $permission, $singularName, $pluralName] = $this->parseNamespace($namespace);
 
         // user can't create resource at all
-        if ( ! $user->hasPermission($permission)) {
+        if ( ! $this->userhasPermission($user, $permission)) {
             return false;
         }
 
@@ -84,13 +92,18 @@ abstract class BasePolicy
         return true;
     }
 
+    protected function userHasPermission(User $user, string $permission): bool
+    {
+        return $user->hasPermission($permission);
+    }
+
     protected function parseNamespace(string $namespace, string $ability = 'create'): array
     {
         // 'App\SomeModel' => 'Some_Model'
         $resourceName = Str::snake(class_basename($namespace));
 
-        // 'Some_Model' => 'some_models'
-        $relationName = strtolower(Str::plural($resourceName));
+        // 'Some_Model' => 'someModels'
+        $relationName = Str::camel(Str::plural($resourceName));
 
         // 'Some_Model' => 'Some Model'
         $singularName = str_replace('_', ' ', $resourceName);

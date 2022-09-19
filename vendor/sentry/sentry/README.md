@@ -1,16 +1,13 @@
 <p align="center">
-    <a href="https://sentry.io" target="_blank" align="center">
-        <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" width="280">
-    </a>
+  <a href="https://sentry.io" target="_blank" align="center">
+    <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" width="280">
+  </a>
+  <br />
 </p>
 
+_Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us [<kbd>**Check out our open positions**</kbd>](https://sentry.io/careers/)_
+
 # Sentry SDK for PHP
-
-> Please note that the `2.x` branch of the Sentry PHP SDK is no longer actively maintained and will only receive bug-fix and security updates.
->
-> For the most recent Sentry PHP SDK see the [default branch](https://github.com/getsentry/sentry-php).
-
----
 
 [![Total Downloads](https://poser.pugx.org/sentry/sentry/downloads)](https://packagist.org/packages/sentry/sentry)
 [![Monthly Downloads](https://poser.pugx.org/sentry/sentry/d/monthly)](https://packagist.org/packages/sentry/sentry)
@@ -20,7 +17,8 @@
 
 | Version | Build Status | Code Coverage |
 |:---------:|:-------------:|:-----:|
-| `2.x`| [![CI][2.x Build Status Image]][2.x Build Status] | [![Coverage Status][2.x Code Coverage Image]][2.x Code Coverage] |
+| `master`| [![CI][master Build Status Image]][master Build Status] | [![Coverage Status][master Code Coverage Image]][master Code Coverage] |
+| `develop`| [![CI][develop Build Status Image]][develop Build Status] | [![Coverage Status][develop Code Coverage Image]][develop Code Coverage] |
 
 The Sentry PHP error reporter tracks errors and exceptions that happen during the
 execution of your application and provides instant notification with detailed
@@ -81,13 +79,18 @@ The following integrations are fully supported and maintained by the Sentry team
 The following integrations are available and maintained by members of the Sentry community.
 
 - [Drupal](https://www.drupal.org/project/raven)
-- [Flow Framework](https://github.com/networkteam/Networkteam.SentryClient)
-- [OXID eShop](https://github.com/OXIDprojects/sentry)
+- [Neos Flow](https://github.com/flownative/flow-sentry)
 - [WordPress](https://wordpress.org/plugins/wp-sentry-integration/)
 - [ZendFramework](https://github.com/facile-it/sentry-module)
-- [SilverStripe](https://github.com/phptek/silverstripe-sentry)
-- [TYPO3](https://github.com/networkteam/sentry_client)
+- [Yii2](https://github.com/notamedia/yii2-sentry)
+- [Silverstripe](https://github.com/phptek/silverstripe-sentry)
 - ... feel free to be famous, create a port to your favourite platform!
+
+### 3rd party integrations using old SDK 2.x
+
+- [Neos Flow](https://github.com/networkteam/Networkteam.SentryClient)
+- [OXID eShop](https://github.com/OXIDprojects/sentry)
+- [TYPO3](https://github.com/networkteam/sentry_client)
 
 ### 3rd party integrations using old SDK 1.x
 
@@ -115,7 +118,11 @@ Tests can then be run via phpunit:
 $ vendor/bin/phpunit
 ```
 
-[2.x Build Status]: https://github.com/getsentry/sentry-php/actions?query=workflow%3ACI+branch%3A2.x
-[2.x Build Status Image]: https://github.com/getsentry/sentry-php/workflows/CI/badge.svg?branch=2.x
-[2.x Code Coverage]: https://codecov.io/gh/getsentry/sentry-php/branch/2.x
-[2.x Code Coverage Image]: https://img.shields.io/codecov/c/github/getsentry/sentry-php/2.x?logo=codecov
+[master Build Status]: https://github.com/getsentry/sentry-php/actions?query=workflow%3ACI+branch%3Amaster
+[master Build Status Image]: https://github.com/getsentry/sentry-php/workflows/CI/badge.svg?branch=master
+[develop Build Status]: https://github.com/getsentry/sentry-php/actions?query=workflow%3ACI+branch%3Adevelop
+[develop Build Status Image]: https://github.com/getsentry/sentry-php/workflows/CI/badge.svg?branch=develop
+[master Code Coverage]: https://codecov.io/gh/getsentry/sentry-php/branch/master
+[master Code Coverage Image]: https://img.shields.io/codecov/c/github/getsentry/sentry-php/master?logo=codecov
+[develop Code Coverage]: https://codecov.io/gh/getsentry/sentry-php/branch/develop
+[develop Code Coverage Image]: https://img.shields.io/codecov/c/github/getsentry/sentry-php/develop?logo=codecov

@@ -41,10 +41,12 @@ class CreateFileEntry
         }
         
         // merge extra data specified by user
+        $userId = Arr::get($extra, 'userId', Auth::id());
         $data = array_merge($data, [
             'parent_id' => Arr::get($extra, 'parentId'),
             'disk_prefix' => Arr::get($extra, 'diskPrefix'),
             'public' => !!Arr::get($extra, 'diskPrefix'),
+            'owner_id' => $userId,
         ]);
 
         // public files will be stored with extension
@@ -52,7 +54,6 @@ class CreateFileEntry
             $data['file_name'] = $data['file_name'] . '.' . $data['extension'];
         }
 
-        $userId = Arr::get($extra, 'userId', Auth::id());
         $relativePath = Arr::get($extra, 'relativePath');
         $entries = new Collection();
 
@@ -96,7 +97,9 @@ class CreateFileEntry
 
         $entries->load('users');
 
-        $fileEntry->all_parents = $path['allParents'] ?? [];
+        $fileEntry->setAttribute('all_parents', $path['allParents'] ?? []);
+        // prevent eloquent trying to save "all_parents" into database
+        $fileEntry->syncOriginalAttribute('all_parents');
 
         return $fileEntry;
     }
@@ -110,11 +113,8 @@ class CreateFileEntry
     private function createPath($path, $parentId, $userId)
     {
         $newlyCreated = collect();
-        $path = collect(explode('/', $path));
-        $path = $path->filter(function($name) {
-            return $name && !Str::contains($name, '.');
-        });
-
+        // remove file name from path and split into folder names
+        $path = collect(explode('/', dirname($path)))->filter();
         if ($path->isEmpty()) return $path;
 
         $allParents = $path->reduce(function($parents, $name) use($parentId, $userId, $newlyCreated) {

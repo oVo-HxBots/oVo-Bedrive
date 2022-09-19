@@ -122,7 +122,7 @@ class CopyEntriesController extends BaseController
     {
         $newName = $original->name;
         $newOwnerId = $this->getCopyOwnerId();
-        $copyingIntoSameDrive = $newOwnerId === $original->getOwner()->id;
+        $copyingIntoSameDrive = $newOwnerId === $original->owner_id;
 
         // if no parent ID is specified and we are copying into the
         // same users drive, we can copy into the same folder as original

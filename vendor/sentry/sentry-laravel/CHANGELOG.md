@@ -2,6 +2,110 @@
 
 ## Unreleased
 
+## 2.7.0
+
+- Replace type hint of concrete type (`Sentry\State\Hub`) with interface (`Sentry\State\HubInterface`) in `SentryHandler` constructor (#496)
+- Use latest version of the Sentry PHP SDK (#499)
+
+## 2.6.0
+
+- Add all log context as `log_context` to events when using the log channel (#489)
+- Add integration to improve performance tracing for [Laravel Lighthouse](https://github.com/nuwave/lighthouse) (#490)
+
+## 2.5.3
+
+- Correctly call flush on the PHP SDK client (#484)
+- Fix errors on Laravel `5.x` caused by Laravel not using `nyholm/psr7` to generate PSR-7 request but older `zendframework/zend-diactoros` package which might not be available
+
+## 2.5.2
+
+- Fix problem with parsing uploaded files from request after they have been moved (#487)
+
+## 2.5.1
+
+- Fix problem with queue tracing when triggered from unit tests or when missing a queue name in the event
+
+## 2.5.0
+
+- Add `sql.origin` to SQL query spans with the file and line where the SQL query originated from (#398)
+- Remove wrapper around the context of log entry breadcrumbs (#405)
+- Ensure user integrations are always executed after SDK integrations (#474)
+- Fix repeated booted callback registration from performance tracing middleware (#475)
+- Add tracing support for queue jobs, enable with `SENTRY_TRACE_QUEUE_ENABLED=true` (#478)
+- Add options to disable parts of performance tracing (#478)
+- Remove string representation of exception from exceptions logged through log channels (#482)
+- Use message from Monolog record to prevent bloating the log message being recorded with timestamps and log log level (#482)
+- Add `report_exceptions` option to the Sentry log channel that can be set to `false` to not report exceptions (#482)
+
+## 2.4.2
+
+- Avoid collision if another package has bound `sentry` in the Laravel container (#467)
+
+## 2.4.1
+
+- Fix type hints incompatible with Laravel Lumen (#462)
+
+## 2.4.0
+
+- Read the request IP from the Laravel request to make it more accurate when behind a reverse proxy (requires [trusted proxies](https://laravel.com/docs/8.x/requests#configuring-trusted-proxies) to be setup correctly) (#419)
+- Get request information (like the URL) from the Laravel request instead of constructing it from the global state (#419)
+- Fix generated route name not correctly ignored when using prefix (#441)
+- Fix overwriting the transaction name if it's set by the user (#442)
+- Add result from optional `context(): array` method on captured exception to the event sent to Sentry (#457)
+- Fix not overwriting the event transaction name if it was an empty string (#460)
+- Bump Sentry SDK to `3.2.*`
+
+## 2.3.1
+
+- Fix problems when enabling tracing on Laravel Lumen (#416)
+- PHP 8 Support (#431)
+
+## 2.3.0
+
+- Bump Sentry SDK to `3.1.*` (#420)
+
+## 2.2.0
+
+- Fix incorrectly stripped base controller action from transaction name (#406)
+- Move tracing request/response data hydration to the tracing middleware (#408)
+
+## 2.1.1
+
+- Fix for potential `Undefined index: controllers_base_namespace.` notice
+
+## 2.1.0
+
+- Added a option (`controllers_base_namespace`) to strip away the controller base namespace for cleaner transaction names (#393)
+- Fix incompatibility with other packages that also decorate the view engine, like Livewire (#395)
+
+## 2.0.1
+
+- Improve performance tracing by nesting `view.render` spans and adding a `app.handle` span showing how long the actual application code runs after Laravel bootstrapping (#387)
+- Improve UX of `sentry:publish` command
+
+## 2.0.0
+
+**Breaking Change**: This version uses the [envelope endpoint](https://develop.sentry.dev/sdk/envelopes/). If you are
+using an on-premise installation it requires Sentry version `>= v20.6.0` to work. If you are using
+[sentry.io](https://sentry.io) nothing will change and no action is needed.
+
+**Tracing API / Monitor Performance**
+
+In this version we released API for Tracing. `\Sentry\startTransaction` is your entry point for manual instrumentation.
+More information can be found in our [Performance](https://docs.sentry.io/platforms/php/guides/laravel/performance/) docs.
+
+- Using `^3.0` of Sentry PHP SDK
+- Add support for Tracing, enable it by setting `traces_sample_rate` in the config to a value > 0 (the value should be larger than `0.0` and smaller or equal than `1.0` (to send everything))
+
+## 2.0.0-beta1
+
+**Breaking Change**: This version uses the [envelope endpoint](https://develop.sentry.dev/sdk/envelopes/). If you are
+using an on-premise installation it requires Sentry version `>= v20.6.0` to work. If you are using
+[sentry.io](https://sentry.io) nothing will change and no action is needed.
+
+- Using `3.0.0-beta1` of Sentry PHP SDK
+- Add support for Tracing, enable it by setting `traces_sample_rate` in the config to a value > 0 (the value should be larger than `0.0` and smaller or equal than `1.0` (to send everything))
+
 ## 1.9.0
 
 - Respect the `SENTRY_ENVIRONMENT` environment variable to override the Laravel environment (#354)

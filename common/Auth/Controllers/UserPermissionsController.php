@@ -17,21 +17,13 @@ class UserPermissionsController extends BaseController
      */
     private $request;
 
-    /**
-     * @param UserRepository $repository
-     * @param Request $request
-     */
     public function __construct(UserRepository $repository, Request $request)
     {
         $this->repository = $repository;
         $this->request = $request;
     }
 
-    /**
-     * @param int $userId
-     * @return JsonResponse
-     */
-    public function add($userId)
+    public function add(int $userId)
     {
         $user = $this->repository->findOrFail($userId);
 
@@ -47,11 +39,7 @@ class UserPermissionsController extends BaseController
         ]);
     }
 
-    /**
-     * @param int $userId
-     * @return JsonResponse
-     */
-    public function remove($userId)
+    public function remove(int $userId)
     {
         $user = $this->repository->findOrFail($userId);
 

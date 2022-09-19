@@ -69,7 +69,7 @@ class PaypalSubscriptions implements GatewaySubscriptionsInterface
             'name'        => config('app.name')." subscription: {$plan->name}.",
             'description' => "{$plan->name} subscription on ".config('app.name'),
             'planId' => $this->paypalPlans->getPlanId($plan),
-            'startDate' => $startDate ? Carbon::parse($startDate) : Carbon::now('utc')->endOfDay(),
+            'startDate' => $startDate ? Carbon::parse($startDate) : Carbon::now('utc')->addMinute(),
             'payerDetails' => ['payment_method' => 'paypal'],
         ])->send();
 

@@ -1,6 +1,7 @@
 <?php namespace Common\Core\Policies;
 
 use App\User;
+use Common\Auth\Roles\Role;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class RolePolicy
@@ -22,8 +23,8 @@ class RolePolicy
         return $user->hasPermission('roles.update');
     }
 
-    public function destroy(User $user)
+    public function destroy(User $user, Role $role)
     {
-        return $user->hasPermission('roles.delete');
+        return !$role->internal && $user->hasPermission('roles.delete');
     }
 }

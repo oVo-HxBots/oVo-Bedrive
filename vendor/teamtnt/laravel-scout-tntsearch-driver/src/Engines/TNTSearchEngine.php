@@ -2,16 +2,22 @@
 
 namespace TeamTNT\Scout\Engines;
 
+use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\LazyCollection;
+use InvalidArgumentException;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Engines\Engine;
+use TeamTNT\Scout\Events\SearchPerformed;
 use TeamTNT\TNTSearch\Exceptions\IndexNotFoundException;
 use TeamTNT\TNTSearch\TNTSearch;
 
 class TNTSearchEngine extends Engine
 {
+
+    private $filters;
     /**
      * @var TNTSearch
      */
@@ -30,6 +36,11 @@ class TNTSearchEngine extends Engine
     public function __construct(TNTSearch $tnt)
     {
         $this->tnt = $tnt;
+    }
+
+    public function getTNT()
+    {
+        return $this->tnt;
     }
 
     /**
@@ -160,10 +171,18 @@ class TNTSearchEngine extends Engine
                 $options
             );
         }
+
+        $builder->query = $this->applyFilters('query_expansion', $builder->query, get_class($builder->model));
+
         if (isset($this->tnt->config['searchBoolean']) ? $this->tnt->config['searchBoolean'] : false) {
-            return $this->tnt->searchBoolean($builder->query, $limit);
+            $res = $this->tnt->searchBoolean($builder->query, $limit);
+            event(new SearchPerformed($builder, $res, true));
+            return $res;
+
         } else {
-            return $this->tnt->search($builder->query, $limit);
+            $res = $this->tnt->search($builder->query, $limit);
+            event(new SearchPerformed($builder, $res));
+            return $res;
         }
     }
 
@@ -177,7 +196,7 @@ class TNTSearchEngine extends Engine
      */
     public function map(Builder $builder, $results, $model)
     {
-        if (is_null($results['ids']) || count($results['ids']) === 0) {
+        if (empty($results['ids'])) {
             return Collection::make();
         }
 
@@ -199,7 +218,46 @@ class TNTSearchEngine extends Engine
         }
 
         // sort models by tnt search result set
-        return collect($results['ids'])->map(function ($hit) use ($models) {
+        return $model->newCollection($results['ids'])->map(function ($hit) use ($models) {
+            if (isset($models[$hit])) {
+                return $models[$hit];
+            }
+        })->filter()->values();
+    }
+
+    /**
+     * Map the given results to instances of the given model via a lazy collection.
+     *
+     * @param mixed                               $results
+     * @param \Illuminate\Database\Eloquent\Model $model
+     *
+     * @return LazyCollection
+     */
+    public function lazyMap(Builder $builder, $results, $model)
+    {
+        if (empty($results['ids'])) {
+            return LazyCollection::make();
+        }
+
+        $keys = collect($results['ids'])->values()->all();
+
+        $builder = $this->getBuilder($model);
+
+        if ($this->builder->queryCallback) {
+            call_user_func($this->builder->queryCallback, $builder);
+        }
+
+        $models = $builder->whereIn(
+            $model->getQualifiedKeyName(), $keys
+        )->get()->keyBy($model->getKeyName());
+
+        // sort models by user choice
+        if (!empty($this->builder->orders)) {
+            return $models->values();
+        }
+
+        // sort models by tnt search result set
+        return $model->newCollection($results['ids'])->map(function ($hit) use ($models) {
             if (isset($models[$hit])) {
                 return $models[$hit];
             }
@@ -236,6 +294,10 @@ class TNTSearchEngine extends Engine
      */
     public function mapIds($results)
     {
+        if (empty($results['ids'])) {
+            return collect();
+        }
+
         return collect($results['ids'])->values();
     }
 
@@ -288,7 +350,7 @@ class TNTSearchEngine extends Engine
 
         $discardIds = $builder->model->newQuery()
             ->select($qualifiedKeyName)
-            ->leftJoin(DB::raw('('.$sub->getQuery()->toSql().') as '. $builder->model->getConnection()->getTablePrefix() .'sub'), $subQualifiedKeyName, '=', $qualifiedKeyName)
+            ->leftJoin(DB::raw('('.$sub->getQuery()->toSql().') as '.$builder->model->getConnection()->getTablePrefix().'sub'), $subQualifiedKeyName, '=', $qualifiedKeyName)
             ->addBinding($sub->getQuery()->getBindings(), 'join')
             ->whereIn($qualifiedKeyName, $searchResults)
             ->whereNull($subQualifiedKeyName)
@@ -332,7 +394,7 @@ class TNTSearchEngine extends Engine
          *
          * When no __soft_deleted statement is given return all entries
          */
-        if (!in_array('__soft_deleted', $this->builder->wheres)) {
+        if (!array_key_exists('__soft_deleted', $this->builder->wheres)) {
             return $builder->withTrashed();
         }
 
@@ -401,5 +463,78 @@ class TNTSearchEngine extends Engine
         if (file_exists($pathToIndex)) {
             unlink($pathToIndex);
         }
+    }
+
+
+    /**
+     * Create a search index.
+     *
+     * @param  string  $name
+     * @param  array  $options
+     * @return mixed
+     *
+     * @throws \Exception
+     */
+    public function createIndex($name, array $options = [])
+    {
+        throw new Exception('TNT indexes are created automatically upon adding objects.');
+    }
+
+    /**
+     * Delete a search index.
+     *
+     * @param  string  $name
+     * @return mixed
+     */
+    public function deleteIndex($name)
+    {
+        throw new Exception(sprintf('TNT indexes cannot reliably be removed. Please manually remove the file in %s/%s.index', config('scout.tntsearch.storage'), $name));
+    }
+
+    /**
+     * Adds a filter
+     *
+     * @param  string
+     * @param  callback
+     * @return void
+     */
+    public function addFilter($name, $callback)
+    {
+        if (!is_callable($callback, true)) {
+            throw new InvalidArgumentException(sprintf('Filter is an invalid callback: %s.', print_r($callback, true)));
+        }
+        $this->filters[$name][] = $callback;
+    }
+
+    /**
+     * Returns an array of filters
+     *
+     * @param  string
+     * @return array
+     */
+    public function getFilters($name)
+    {
+        return isset($this->filters[$name]) ? $this->filters[$name] : [];
+    }
+
+    /**
+     * Returns a string on which a filter is applied
+     *
+     * @param  string
+     * @param  string
+     * @return string
+     */
+    public function applyFilters($name, $result, $model)
+    {
+        foreach ($this->getFilters($name) as $callback) {
+            // prevent fatal errors, do your own warning or
+            // exception here as you need it.
+            if (!is_callable($callback)) {
+                continue;
+            }
+
+            $result = call_user_func($callback, $result, $model);
+        }
+        return $result;
     }
 }

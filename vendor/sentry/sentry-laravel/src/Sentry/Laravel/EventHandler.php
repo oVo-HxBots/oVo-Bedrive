@@ -6,8 +6,11 @@ use Exception;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobProcessed;
@@ -16,7 +19,6 @@ use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Routing\Route;
-use Illuminate\Support\Str;
 use RuntimeException;
 use Sentry\Breadcrumb;
 use Sentry\SentrySdk;
@@ -65,11 +67,11 @@ class EventHandler
     ];
 
     /**
-     * The Laravel event dispatcher.
+     * The Laravel container.
      *
-     * @var \Illuminate\Contracts\Events\Dispatcher
+     * @var \Illuminate\Contracts\Container\Container
      */
-    private $events;
+    private $container;
 
     /**
      * Indicates if we should we add SQL queries to the breadcrumbs.
@@ -116,12 +118,13 @@ class EventHandler
     /**
      * EventHandler constructor.
      *
-     * @param \Illuminate\Contracts\Events\Dispatcher $events
-     * @param array                                   $config
+     * @param \Illuminate\Contracts\Container\Container $container
+     * @param array                                     $config
      */
-    public function __construct(Dispatcher $events, array $config)
+    public function __construct(Container $container, array $config)
     {
-        $this->events = $events;
+        $this->container = $container;
+
         $this->recordSqlQueries = ($config['breadcrumbs.sql_queries'] ?? $config['breadcrumbs']['sql_queries'] ?? true) === true;
         $this->recordSqlBindings = ($config['breadcrumbs.sql_bindings'] ?? $config['breadcrumbs']['sql_bindings'] ?? false) === true;
         $this->recordLaravelLogs = ($config['breadcrumbs.logs'] ?? $config['breadcrumbs']['logs'] ?? true) === true;
@@ -132,20 +135,34 @@ class EventHandler
     /**
      * Attach all event handlers.
      */
-    public function subscribe()
+    public function subscribe(): void
     {
-        foreach (static::$eventHandlerMap as $eventName => $handler) {
-            $this->events->listen($eventName, [$this, $handler]);
+        /** @var \Illuminate\Contracts\Events\Dispatcher $dispatcher */
+        try {
+            $dispatcher = $this->container->make(Dispatcher::class);
+
+            foreach (static::$eventHandlerMap as $eventName => $handler) {
+                $dispatcher->listen($eventName, [$this, $handler]);
+            }
+        } catch (BindingResolutionException $e) {
+            // If we cannot resolve the event dispatcher we also cannot listen to events
         }
     }
 
     /**
      * Attach all authentication event handlers.
      */
-    public function subscribeAuthEvents()
+    public function subscribeAuthEvents(): void
     {
-        foreach (static::$authEventHandlerMap as $eventName => $handler) {
-            $this->events->listen($eventName, [$this, $handler]);
+        /** @var \Illuminate\Contracts\Events\Dispatcher $dispatcher */
+        try {
+            $dispatcher = $this->container->make(Dispatcher::class);
+
+            foreach (static::$authEventHandlerMap as $eventName => $handler) {
+                $dispatcher->listen($eventName, [$this, $handler]);
+            }
+        } catch (BindingResolutionException $e) {
+            // If we cannot resolve the event dispatcher we also cannot listen to events
         }
     }
 
@@ -154,15 +171,22 @@ class EventHandler
      *
      * @param \Illuminate\Queue\QueueManager $queue
      */
-    public function subscribeQueueEvents(QueueManager $queue)
+    public function subscribeQueueEvents(QueueManager $queue): void
     {
         $queue->looping(function () {
             $this->cleanupScopeForQueuedJob();
             $this->afterQueuedJob();
         });
 
-        foreach (static::$queueEventHandlerMap as $eventName => $handler) {
-            $this->events->listen($eventName, [$this, $handler]);
+        /** @var \Illuminate\Contracts\Events\Dispatcher $dispatcher */
+        try {
+            $dispatcher = $this->container->make(Dispatcher::class);
+
+            foreach (static::$queueEventHandlerMap as $eventName => $handler) {
+                $dispatcher->listen($eventName, [$this, $handler]);
+            }
+        } catch (BindingResolutionException $e) {
+            // If we cannot resolve the event dispatcher we also cannot listen to events
         }
     }
 
@@ -174,7 +198,7 @@ class EventHandler
      */
     public function __call($method, $arguments)
     {
-        $handlerMethod = $handlerMethod = "{$method}Handler";
+        $handlerMethod = "{$method}Handler";
 
         if (!method_exists($this, $handlerMethod)) {
             throw new RuntimeException("Missing event handler: {$handlerMethod}");
@@ -194,27 +218,7 @@ class EventHandler
      */
     protected function routerMatchedHandler(Route $route)
     {
-        $routeName = null;
-
-        if ($route->getName()) {
-            // someaction (route name/alias)
-            $routeName = $route->getName();
-
-            // Laravel 7 route caching generates a route names if the user didn't specify one
-            // theirselfs to optimize route matching. These route names are useless to the
-            // developer so if we encounter a generated route name we discard the value
-            if (Str::startsWith($routeName, 'generated::')) {
-                $routeName = null;
-            }
-        }
-
-        if (empty($routeName) && $route->getActionName()) {
-            // SomeController@someAction (controller action)
-            $routeName = $route->getActionName();
-        } elseif (empty($routeName) || $routeName === 'Closure') {
-            // /someaction // Fallback to the url
-            $routeName = $route->uri();
-        }
+        $routeName = Integration::extractNameForRoute($route) ?? '<unlabeled transaction>';
 
         Integration::addBreadcrumb(new Breadcrumb(
             Breadcrumb::LEVEL_INFO,
@@ -343,7 +347,7 @@ class EventHandler
             Breadcrumb::TYPE_DEFAULT,
             'log.' . $level,
             $message,
-            empty($context) ? [] : ['params' => $context]
+            $context
         ));
     }
 
@@ -381,10 +385,27 @@ class EventHandler
      */
     protected function authenticatedHandler(Authenticated $event)
     {
-        Integration::configureScope(static function (Scope $scope) use ($event): void {
-            $scope->setUser([
-                'id' => $event->user->getAuthIdentifier(),
-            ], true);
+        $userData = [
+            'id' => $event->user->getAuthIdentifier(),
+        ];
+
+        try {
+            /** @var \Illuminate\Http\Request $request */
+            $request = $this->container->make('request');
+
+            if ($request instanceof Request) {
+                $ipAddress = $request->ip();
+
+                if ($ipAddress !== null) {
+                    $userData['ip_address'] = $ipAddress;
+                }
+            }
+        } catch (BindingResolutionException $e) {
+            // If there is no request bound we cannot get the IP address from it
+        }
+
+        Integration::configureScope(static function (Scope $scope) use ($userData): void {
+            $scope->setUser($userData);
         });
     }
 
@@ -425,7 +446,7 @@ class EventHandler
     /**
      * Since Laravel 5.2
      *
-     * @param \Illuminate\Queue\Events\JobProcessing $event
+     * @param \Illuminate\Queue\Events\JobExceptionOccurred $event
      */
     protected function queueJobExceptionOccurredHandler(JobExceptionOccurred $event)
     {
@@ -435,7 +456,7 @@ class EventHandler
     /**
      * Since Laravel 5.2
      *
-     * @param \Illuminate\Queue\Events\JobProcessing $event
+     * @param \Illuminate\Queue\Events\JobProcessed $event
      */
     protected function queueJobProcessedHandler(JobProcessed $event)
     {
@@ -445,7 +466,7 @@ class EventHandler
     /**
      * Since Laravel 5.2
      *
-     * @param \Illuminate\Queue\Events\JobProcessing $event
+     * @param \Illuminate\Queue\Events\WorkerStopping $event
      */
     protected function queueWorkerStoppingHandler(WorkerStopping $event)
     {

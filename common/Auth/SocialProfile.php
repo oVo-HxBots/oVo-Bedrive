@@ -16,6 +16,9 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder|SocialProfile whereId($value)
  * @mixin \Eloquent
  * @property string $username
+ * @method static Builder|SocialProfile newModelQuery()
+ * @method static Builder|SocialProfile newQuery()
+ * @method static Builder|SocialProfile query()
  */
 class SocialProfile extends Model {
 

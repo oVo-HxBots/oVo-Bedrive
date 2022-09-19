@@ -4,12 +4,13 @@ namespace App;
 
 use Common\Auth\BaseUser;
 use Common\Workspaces\Workspace;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends BaseUser
 {
-    use HasApiTokens;
+    use HasApiTokens, HasFactory;
 
     public function workspaces(): HasMany
     {

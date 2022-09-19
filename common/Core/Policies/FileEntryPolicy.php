@@ -61,7 +61,6 @@ class FileEntryPolicy
 
     public function store(User $user, int $parentId = null): bool
     {
-
         //check if user can modify parent entry (if specified)
         if ($parentId) {
             return $this->userCan($user, 'files.update', [$parentId]);
@@ -135,7 +134,7 @@ class FileEntryPolicy
     {
         if ($entries instanceof FileEntry) {
             return $entries->newCollection([$entries]);
-        } else if (is_array($entries)) {
+        } else if (isset($entries[0]) && is_numeric($entries[0])) {
             return app(FileEntry::class)
                 ->whereIn('id', $entries)
                 ->get();

@@ -1,13 +1,11 @@
 <?php namespace Common\Billing\Subscriptions;
 
-use Closure;
 use Common\Billing\BillingPlan;
 use Common\Billing\Subscription;
-use Illuminate\Database\Eloquent\Builder;
+use Common\Core\BaseController;
+use Common\Database\Datasource\MysqlDataSource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Common\Core\BaseController;
-use Common\Database\Paginator;
 
 class SubscriptionsController extends BaseController
 {
@@ -26,17 +24,11 @@ class SubscriptionsController extends BaseController
      */
     private $subscription;
 
-    /**
-     * @param Request $request
-     * @param BillingPlan $billingPlan
-     * @param Subscription $subscription
-     */
     public function __construct(
         Request $request,
         BillingPlan $billingPlan,
         Subscription $subscription
-    )
-    {
+    ) {
         $this->request = $request;
         $this->billingPlan = $billingPlan;
         $this->subscription = $subscription;
@@ -44,25 +36,16 @@ class SubscriptionsController extends BaseController
         $this->middleware('auth');
     }
 
-    /**
-     * Paginate all existing subscriptions.
-     *
-     * @return JsonResponse
-     */
     public function index()
     {
         $this->authorize('index', Subscription::class);
 
-        $paginator = (new Paginator($this->subscription, $this->request->all()))->with('user');
-        $paginator->filterColumns = ['gateway', 'cancelled'];
+        $dataSource = new MysqlDataSource(
+            $this->subscription->with(['user']),
+            $this->request->all(),
+        );
 
-        $paginator->searchCallback = function(Builder $query, $searchTerm) {
-            $query->whereHas('user', function(Builder $query) use($searchTerm) {
-                $query->where('email', 'like', "$searchTerm%");
-            })->orWhere('gateway', 'like', "$searchTerm%");
-        };
-
-        $pagination = $paginator->paginate();
+        $pagination = $dataSource->paginate();
 
         return $this->success(['pagination' => $pagination]);
     }
@@ -104,7 +87,7 @@ class SubscriptionsController extends BaseController
             'renews_at' => 'date|nullable',
             'ends_at' => 'date|nullable',
             'plan_id' => 'integer|exists:billing_plans,id',
-            'description' => 'string|nullable'
+            'description' => 'string|nullable',
         ]);
 
         $subscription = $this->subscription->findOrFail($id);
@@ -123,12 +106,14 @@ class SubscriptionsController extends BaseController
     public function changePlan($id)
     {
         $this->validate($this->request, [
-            'newPlanId' => 'required|integer|exists:billing_plans,id'
+            'newPlanId' => 'required|integer|exists:billing_plans,id',
         ]);
 
         /** @var Subscription $subscription */
         $subscription = $this->subscription->findOrFail($id);
-        $plan = $this->billingPlan->findOrfail($this->request->get('newPlanId'));
+        $plan = $this->billingPlan->findOrfail(
+            $this->request->get('newPlanId'),
+        );
 
         $subscription->changePlan($plan);
 
@@ -145,7 +130,7 @@ class SubscriptionsController extends BaseController
     public function cancel($id)
     {
         $this->validate($this->request, [
-            'delete' => 'boolean'
+            'delete' => 'boolean',
         ]);
 
         /** @var Subscription $subscription */

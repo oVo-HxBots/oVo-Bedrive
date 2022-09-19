@@ -20,10 +20,6 @@ class GetShareableLink
      */
     private $entry;
 
-    /**
-     * @param ShareableLink $link
-     * @param FileEntry $entry
-     */
     public function __construct(ShareableLink $link, FileEntry $entry)
     {
         $this->link = $link;

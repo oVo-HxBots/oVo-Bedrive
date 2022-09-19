@@ -23,6 +23,11 @@ final class ErrorHandler
     public const DEFAULT_RESERVED_MEMORY_SIZE = 10240;
 
     /**
+     * The fatal error types that cannot be silenced using the @ operator in PHP 8+.
+     */
+    private const PHP8_UNSILENCEABLE_FATAL_ERRORS = \E_ERROR | \E_PARSE | \E_CORE_ERROR | \E_COMPILE_ERROR | \E_USER_ERROR | \E_RECOVERABLE_ERROR;
+
+    /**
      * @var self|null The current registered handler (this class is a singleton)
      */
     private static $handlerInstance;
@@ -88,7 +93,7 @@ final class ErrorHandler
     private static $reservedMemory;
 
     /**
-     * @var array List of error levels and their description
+     * @var array<string, string> List of error levels and their description
      */
     private const ERROR_LEVELS_DESCRIPTION = [
         \E_DEPRECATED => 'Deprecated',
@@ -118,38 +123,6 @@ final class ErrorHandler
     {
         $this->exceptionReflection = new \ReflectionProperty(\Exception::class, 'trace');
         $this->exceptionReflection->setAccessible(true);
-    }
-
-    /**
-     * Gets the current registered error handler; if none is present, it will
-     * register it. Subsequent calls will not change the reserved memory size.
-     *
-     * @param int  $reservedMemorySize The amount of memory to reserve for the
-     *                                 fatal error handler
-     * @param bool $triggerDeprecation Whether to trigger the deprecation about
-     *                                 the usage of this method. This is used
-     *                                 to avoid errors when this method is called
-     *                                 from other methods of this class until
-     *                                 their implementation and behavior of
-     *                                 registering all handlers can be changed
-     *
-     * @deprecated since version 2.1, to be removed in 3.0.
-     */
-    public static function registerOnce(int $reservedMemorySize = self::DEFAULT_RESERVED_MEMORY_SIZE, bool $triggerDeprecation = true): self
-    {
-        if ($triggerDeprecation) {
-            @trigger_error(sprintf('Method %s() is deprecated since version 2.1 and will be removed in 3.0. Please use the registerOnceErrorHandler(), registerOnceFatalErrorHandler() or registerOnceExceptionHandler() methods instead.', __METHOD__), \E_USER_DEPRECATED);
-        }
-
-        if (null === self::$handlerInstance) {
-            self::$handlerInstance = new self();
-        }
-
-        self::registerOnceErrorHandler();
-        self::registerOnceFatalErrorHandler($reservedMemorySize);
-        self::registerOnceExceptionHandler();
-
-        return self::$handlerInstance;
     }
 
     /**
@@ -235,72 +208,6 @@ final class ErrorHandler
     }
 
     /**
-     * Adds a listener to the current error handler to be called upon each
-     * invoked captured error; if no handler is registered, this method will
-     * instantiate and register it.
-     *
-     * @param callable $listener A callable that will act as a listener;
-     *                           this callable will receive a single
-     *                           \ErrorException argument
-     *
-     * @psalm-param callable(\ErrorException): void $listener
-     *
-     * @deprecated since version 2.1, to be removed in 3.0
-     */
-    public static function addErrorListener(callable $listener): void
-    {
-        @trigger_error(sprintf('Method %s() is deprecated since version 2.1 and will be removed in 3.0. Use the addErrorHandlerListener() method instead.', __METHOD__), \E_USER_DEPRECATED);
-
-        /** @psalm-suppress DeprecatedMethod */
-        $handler = self::registerOnce(self::DEFAULT_RESERVED_MEMORY_SIZE, false);
-        $handler->errorListeners[] = $listener;
-    }
-
-    /**
-     * Adds a listener to the current error handler to be called upon each
-     * invoked captured fatal error; if no handler is registered, this method
-     * will instantiate and register it.
-     *
-     * @param callable $listener A callable that will act as a listener;
-     *                           this callable will receive a single
-     *                           \ErrorException argument
-     *
-     * @psalm-param callable(FatalErrorException): void $listener
-     *
-     * @deprecated since version 2.1, to be removed in 3.0
-     */
-    public static function addFatalErrorListener(callable $listener): void
-    {
-        @trigger_error(sprintf('Method %s() is deprecated since version 2.1 and will be removed in 3.0. Use the addFatalErrorHandlerListener() method instead.', __METHOD__), \E_USER_DEPRECATED);
-
-        /** @psalm-suppress DeprecatedMethod */
-        $handler = self::registerOnce(self::DEFAULT_RESERVED_MEMORY_SIZE, false);
-        $handler->fatalErrorListeners[] = $listener;
-    }
-
-    /**
-     * Adds a listener to the current error handler to be called upon each
-     * invoked captured exception; if no handler is registered, this method
-     * will instantiate and register it.
-     *
-     * @param callable $listener A callable that will act as a listener;
-     *                           this callable will receive a single
-     *                           \Throwable argument
-     *
-     * @psalm-param callable(\Throwable): void $listener
-     *
-     * @deprecated since version 2.1, to be removed in 3.0
-     */
-    public static function addExceptionListener(callable $listener): void
-    {
-        @trigger_error(sprintf('Method %s() is deprecated since version 2.1 and will be removed in 3.0. Use the addExceptionHandlerListener() method instead.', __METHOD__), \E_USER_DEPRECATED);
-
-        /** @psalm-suppress DeprecatedMethod */
-        $handler = self::registerOnce(self::DEFAULT_RESERVED_MEMORY_SIZE, false);
-        $handler->exceptionListeners[] = $listener;
-    }
-
-    /**
      * Adds a listener to the current error handler that will be called every
      * time an error is captured.
      *
@@ -363,7 +270,24 @@ final class ErrorHandler
      */
     private function handleError(int $level, string $message, string $file, int $line, ?array $errcontext = []): bool
     {
-        if (0 === error_reporting()) {
+        $isSilencedError = 0 === error_reporting();
+
+        if (\PHP_MAJOR_VERSION >= 8) {
+            // Starting from PHP8, when a silenced error occurs the `error_reporting()`
+            // function will return a bitmask of fatal errors that are unsilenceable.
+            // If by subtracting from this value those errors the result is 0, we can
+            // conclude that the error was silenced.
+            $isSilencedError = 0 === (error_reporting() & ~self::PHP8_UNSILENCEABLE_FATAL_ERRORS);
+
+            // However, starting from PHP8 some fatal errors are unsilenceable,
+            // so we have to check for them to avoid reporting any of them as
+            // silenced instead
+            if ($level === (self::PHP8_UNSILENCEABLE_FATAL_ERRORS & $level)) {
+                $isSilencedError = false;
+            }
+        }
+
+        if ($isSilencedError) {
             $errorAsException = new SilencedErrorException(self::ERROR_LEVELS_DESCRIPTION[$level] . ': ' . $message, 0, $level, $file, $line);
         } else {
             $errorAsException = new \ErrorException(self::ERROR_LEVELS_DESCRIPTION[$level] . ': ' . $message, 0, $level, $file, $line);
@@ -403,7 +327,6 @@ final class ErrorHandler
 
             $this->exceptionReflection->setValue($errorAsException, []);
 
-            $this->invokeListeners($this->errorListeners, $errorAsException);
             $this->invokeListeners($this->fatalErrorListeners, $errorAsException);
         }
     }

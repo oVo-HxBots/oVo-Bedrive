@@ -7,9 +7,9 @@ use Common\Core\Policies\BasePolicy;
 
 class CustomDomainPolicy extends BasePolicy
 {
-    public function index(User $user, $userId = null)
+    public function index(User $user, int $userId = null)
     {
-        return $user->hasPermission('custom_domains.view') || $user->id === (int) $userId;
+        return $user->hasPermission('custom_domains.view') || $user->id === $userId;
     }
 
     public function show(User $user, CustomDomain $customDomain)

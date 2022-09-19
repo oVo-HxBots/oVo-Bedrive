@@ -1,4 +1,4 @@
-# TNTSearch Driver for Laravel Scout - Laravel 5.3 - 7.0
+# TNTSearch Driver for Laravel Scout - Laravel 5.3 - 8.0
 
 [![Backers on Open Collective](https://opencollective.com/laravel-scout-tntsearch-driver/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/laravel-scout-tntsearch-driver/sponsors/badge.svg)](#sponsors) [![Latest Version on Packagist](https://img.shields.io/packagist/v/teamtnt/laravel-scout-tntsearch-driver.svg?style=flat-square)](https://packagist.org/packages/teamtnt/laravel-scout-tntsearch-driver)
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE.md)
@@ -6,7 +6,14 @@
 [![Quality Score](https://img.shields.io/scrutinizer/g/teamtnt/laravel-scout-tntsearch-driver.svg?style=flat-square)](https://scrutinizer-ci.com/g/teamtnt/laravel-scout-tntsearch-driver)
 [![Total Downloads](https://img.shields.io/packagist/dt/teamtnt/laravel-scout-tntsearch-driver.svg?style=flat-square)](https://packagist.org/packages/teamtnt/laravel-scout-tntsearch-driver)
 
-This package makes it easy to add full text search support to your models with Laravel 5.3 to 7.0.
+This package makes it easy to add full text search support to your models with Laravel 5.3 to 8.0.
+
+## Premium products
+
+If you find TNT Search to be one of your valuable assets, take a look at one of our premium products
+
+[<img src="https://i.imgur.com/ujagviB.png" width="420px" />](https://analytics.tnt.studio)
+
 
 ## Support us on Open Collective
 
@@ -71,6 +78,7 @@ In your `config/scout.php` add:
     ],
     'asYouType' => false,
     'searchBoolean' => env('TNTSEARCH_BOOLEAN', false),
+    'maxDocs' => env('TNTSEARCH_MAX_DOCS', 500),
 ],
 ```
 To prevent your search indexes being commited to your project repository,
@@ -184,14 +192,14 @@ class PostController extends Controller
 
         if ($request->searchTerm) {
             $constraints = $post; // not necessary but for better readability
-            $post = Department::search($request->searchTerm)->constrain($constraints);
+            $post = Post::search($request->searchTerm)->constrain($constraints);
         }
 
         $post->where('deleted', false);
 
         $post->orderBy('updated_at', 'asc');
 
-        $paginator = $department->paginate(10);
+        $paginator = $post->paginate(10);
         $posts = $paginator->getCollection();
 
         // return posts
@@ -245,24 +253,3 @@ Thank you to all our backers! 🙏 [[Become a backer](https://opencollective.com
 
 <a href="https://opencollective.com/laravel-scout-tntsearch-driver#backers" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/backers.svg?width=890"></a>
 
-
-## Sponsors
-
-Support this project by becoming a sponsor. Your logo will show up here with a link to your website. [[Become a sponsor](https://opencollective.com/laravel-scout-tntsearch-driver#sponsor)]
-
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/0/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/0/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/1/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/1/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/2/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/2/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/3/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/3/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/4/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/4/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/5/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/5/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/6/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/6/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/7/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/7/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/8/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/8/avatar.svg"></a>
-<a href="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/9/website" target="_blank"><img src="https://opencollective.com/laravel-scout-tntsearch-driver/sponsor/9/avatar.svg"></a>
-
-
-
-## License
-
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.

@@ -5,55 +5,58 @@
     "license": "MIT",
     "type": "project",
     "require": {
-        "php": "8.0.9",
-        "algolia/algoliasearch-client-php": "^2.7.0",
+        "php": ">=7.3.0, <8.0",
+        "algolia/algoliasearch-client-php": "^3.0",
         "axisofstevil/stop-words": "^0.1.0",
         "cocur/slugify": "^4.0",
-        "doctrine/dbal": "^2.10",
+        "doctrine/dbal": "^3.1",
         "elasticsearch/elasticsearch": "^7.8.0",
-        "ezyang/htmlpurifier": "^4.12.0",
-        "fideloper/proxy": "^4.2",
-        "fruitcake/laravel-cors": "^1.0",
-        "guzzlehttp/guzzle": "^6.3",
+        "ezyang/htmlpurifier": "^4.13.0",
+        "fideloper/proxy": "^4.4",
+        "fruitcake/laravel-cors": "^2.0",
+        "guzzlehttp/guzzle": "^7.0.1",
+        "http-interop/http-factory-guzzle": "^1.0",
         "intervention/image": "^2.5.1",
-        "kreait/laravel-firebase": "^3.0",
+        "kreait/laravel-firebase": "^3.1",
         "laravel-notification-channels/fcm": "~2.0",
-        "laravel/framework": "^7.0",
-        "laravel/sanctum": "^2.6",
-        "laravel/scout": "^8.0.1",
-        "laravel/slack-notification-channel": "^2.0",
-        "laravel/socialite": "^4.4",
-        "laravel/tinker": "^2.0",
-        "laravel/ui": "^2.0",
+        "laravel/framework": "^8.45",
+        "laravel/horizon": "^5.7",
+        "laravel/sanctum": "^2.11",
+        "laravel/scout": "^9.1.2",
+        "laravel/slack-notification-channel": "^2.3",
+        "laravel/socialite": "^5.0",
+        "laravel/tinker": "^2.6",
+        "laravel/ui": "^3.0",
         "league/flysystem-aws-s3-v3": "^1.0",
         "league/flysystem-rackspace": "^1.0",
         "league/omnipay": "^3.0",
         "maennchen/zipstream-php": "^2.1.0",
+        "matchish/laravel-scout-elasticsearch": "^4.0.7",
+        "meilisearch/meilisearch-php": "^0.18.2",
+        "mhetreramesh/flysystem-backblaze": "^1.6",
         "omnipay/paypal": "^3.0",
         "omnipay/stripe": "^3.0",
         "pda/pheanstalk": "^4.0",
         "predis/predis": "^1.1",
         "pusher/pusher-php-server": "^4.1.4",
-        "sentry/sentry-laravel": "^1.8.0",
+        "sentry/sentry-laravel": "^2.0",
         "spatie/color": "^1.2",
         "spatie/flysystem-dropbox": "^1.2",
-        "spatie/laravel-analytics": "^3.10",
+        "spatie/laravel-analytics": "^3.0",
         "symfony/dom-crawler": "^5.1",
-        "teamtnt/laravel-scout-tntsearch-driver": "^8.3.0",
-        "willdurand/email-reply-parser": "^2.9.0",
-        "zbateson/mail-mime-parser": "^1.2.1"
+        "teamtnt/laravel-scout-tntsearch-driver": "^11.5.0"
     },
     "require-dev": {
-        "facade/ignition": "^2.0",
-        "nunomaduro/collision": "^4.1",
         "barryvdh/laravel-ide-helper": "^2.7.0",
-        "itsgoingd/clockwork": "^4.1.5"
+        "facade/ignition": "^2.5",
+        "fakerphp/faker": "^1.14",
+        "itsgoingd/clockwork": "^5.0.8",
+        "nunomaduro/collision": "^4.1"
     },
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",
-        "sort-packages": true,
-        "platform-check": false
+        "sort-packages": true
     },
     "extra": {
         "laravel": {
@@ -66,7 +69,7 @@
             "Common\\": "common/"
         },
         "classmap": [
-            "database/seeds",
+            "database/seeders",
             "database/factories"
         ]
     },
@@ -87,6 +90,9 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
+        ],
+        "post-update-cmd": [
+            "@php artisan horizon:publish --ansi"
         ]
     }
 }

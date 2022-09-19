@@ -3,9 +3,12 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Folder extends FileEntry
 {
+    use HasFactory;
+
     protected $attributes = [
         'type' => 'folder'
     ];

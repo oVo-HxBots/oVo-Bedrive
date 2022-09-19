@@ -16,6 +16,12 @@ use Illuminate\Database\Eloquent\Model;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @mixin Eloquent
+ * @property string $name
+ * @property bool $is_dark
+ * @property string $colors
+ * @method static \Illuminate\Database\Eloquent\Builder|CssTheme newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|CssTheme newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|CssTheme query()
  */
 class CssTheme extends Model
 {

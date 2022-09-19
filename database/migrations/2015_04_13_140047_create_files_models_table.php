@@ -24,7 +24,6 @@ class CreateFilesModelsTable extends Migration {
             $table->integer('file_size')->nullable()->unsigned();
             $table->integer('user_id')->nullable();
             $table->integer('folder_id')->nullable();
-            $table->string('password')->nullable();
             $table->timestamps();
             $table->softDeletes();
 

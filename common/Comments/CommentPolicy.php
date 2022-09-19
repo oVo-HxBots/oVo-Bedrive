@@ -22,9 +22,9 @@ class CommentPolicy extends BasePolicy
         return $user->hasPermission('comments.create');
     }
 
-    public function update(BaseUser $user, Comment $comment)
+    public function update(BaseUser $user, ?Comment $comment = null)
     {
-        return $user->hasPermission('comments.update') || $comment->user_id === $user->id;
+        return $user->hasPermission('comments.update') || ($comment && $comment->user_id === $user->id);
     }
 
     public function destroy(BaseUser $user, $commentIds)

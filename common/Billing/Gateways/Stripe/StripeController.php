@@ -68,7 +68,7 @@ class StripeController extends BaseController
 
         $sub = $this->stripe->subscriptions()->create($plan, $user, $this->request->get('start_date'));
 
-        if ($sub['status'] !== 'requires_action') {
+        if ($sub['status'] === 'complete') {
             $user->subscribe('stripe', $sub['reference'], $plan);
         }
 
